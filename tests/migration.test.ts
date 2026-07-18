@@ -35,4 +35,23 @@ describe("D1 foundation migration", () => {
     expect(sql).toContain("context_json TEXT NOT NULL");
     expect(sql).not.toMatch(/SELECT.+\$\{/s);
   });
+
+  it("adds encrypted read-only source connections and normalized source records", async () => {
+    const sql = await readFile(new URL("../migrations/0004_readonly_source_connections.sql", import.meta.url), "utf8");
+    for (const table of [
+      "source_oauth_states",
+      "source_connections",
+      "source_courses",
+      "source_coursework",
+      "source_calendar_events"
+    ]) {
+      expect(sql).toContain("CREATE TABLE " + table);
+    }
+    expect(sql).toContain("secret_ciphertext TEXT NOT NULL");
+    expect(sql).toContain("UNIQUE (student_id, provider)");
+    expect(sql).not.toContain("access_token TEXT");
+    expect(sql).not.toContain("refresh_token TEXT");
+    expect(sql).not.toContain("calendar_url TEXT");
+    expect(sql).not.toMatch(/SELECT.+\$\{/s);
+  });
 });

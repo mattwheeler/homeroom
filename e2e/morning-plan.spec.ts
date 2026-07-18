@@ -48,6 +48,19 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
       })
     });
   });
+  await page.route("**/api/integrations/status", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        connections: [{ provider: "google_classroom", status: "active", displayName: "Google Classroom", lastSyncAt: "2026-07-18T12:00:00.000Z", lastErrorCode: null }],
+        courses: [{ provider: "google_classroom", externalId: "google-course-algebra", name: "Algebra I - Period 2", section: "P2", subject: "Mathematics", courseState: "ACTIVE", alternateLink: null, calendarId: null, trackCourseId: "course_algebra_1" }],
+        coursework: [{ provider: "google_classroom", externalId: "work-1", courseExternalId: "google-course-algebra", title: "Linear equations warm-up", description: null, workType: "ASSIGNMENT", dueDate: "2026-08-18", dueTime: "15:00:00", alternateLink: null, updateTime: "2026-07-18T12:00:00.000Z", submissionState: "NEW", late: false }],
+        events: []
+      })
+    });
+  });
   await page.route("**/api/morning-plan", async (route) => {
     expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
     expect(route.request().postDataJSON()).toEqual({});
@@ -462,9 +475,16 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
   await page.goto("/");
   await page.getByRole("button", { name: "Start my day" }).click();
   await expect(page.getByRole("button", { name: /Open .* learning track/ })).toHaveCount(7);
-  await page.getByRole("button", { name: "Open Algebra I learning track" }).click();
-  await expect(page.getByRole("heading", { name: "Starting Strong in Algebra I" })).toBeVisible();
+  await expect(page.getByText("Linear equations warm-up", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open Algebra I - Period 2 learning track" }).click();
+  const learningRoom = page.getByRole("dialog", { name: "Algebra I - Period 2 Learning Room" });
+  await expect(learningRoom).toBeVisible();
+  await expect(learningRoom.getByRole("heading", { name: "Starting Strong in Algebra I" })).toBeVisible();
+  await learningRoom.getByRole("button", { name: "Back to classes" }).click();
+  await expect(learningRoom).toBeHidden();
+  await page.getByRole("button", { name: "Open Algebra I - Period 2 learning track" }).click();
   await page.getByRole("button", { name: "Start 10-minute session" }).click();
+  await expect(learningRoom.getByRole("button", { name: "Back to classes" })).toBeDisabled();
   await expect(page.getByText("We’ll use one quick example, then you’ll take the lead.", { exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Your response to Homeroom" }).fill("Both sides have to stay equal.");
   await page.getByRole("button", { name: "Send to coach" }).click();
@@ -475,6 +495,8 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
   await expect(page.getByText("Active dialogue deleted", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByRole("heading", { name: "What Homeroom remembers" })).toBeHidden();
+  await learningRoom.getByRole("button", { name: "Back to classes" }).click();
+  await expect(learningRoom).toBeHidden();
   await page.getByRole("button", { name: "Ask Matt" }).click();
   await expect(page.getByRole("heading", { name: "Exact notification for Matt" })).toBeVisible();
   await page.getByRole("button", { name: "Approve and notify Matt" }).click();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import {
   getLearningTrack,
@@ -134,14 +134,44 @@ export function LearningWorkspace({
   const [completion, setCompletion] = useState<CompleteLearningResponse | null>(null);
   const [deletedSignals, setDeletedSignals] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const roomRef = useRef<HTMLElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const selectedTrack = useMemo(
     () => selectedCourseId ? getLearningTrack(selectedCourseId) : null,
     [selectedCourseId]
   );
+  const selectedCourse = useMemo(
+    () => courses.find((course) => course.id === selectedCourseId) ?? null,
+    [courses, selectedCourseId]
+  );
   const sessionInProgress = Boolean(
     active && (status === "active" || status === "sending" || status === "completing")
   );
+  const roomLocked = status === "starting" || sessionInProgress;
+
+  useEffect(() => {
+    if (!selectedCourseId) return;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.requestAnimationFrame(() => roomRef.current?.focus());
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previousFocusRef.current?.focus();
+    };
+  }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (!selectedCourseId || roomLocked) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedCourseId(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [roomLocked, selectedCourseId]);
 
   useEffect(() => {
     if (!active || (status !== "active" && status !== "sending" && status !== "completing")) return;
@@ -174,7 +204,7 @@ export function LearningWorkspace({
   }
 
   function selectTrack(courseId: CourseId) {
-    if (sessionInProgress) return;
+    if (roomLocked) return;
     setSelectedCourseId(courseId);
     setStatus("idle");
     setActive(null);
@@ -182,6 +212,11 @@ export function LearningWorkspace({
     setCompletion(null);
     setError("");
     void loadContext(courseId);
+  }
+
+  function closeRoom() {
+    if (roomLocked) return;
+    setSelectedCourseId(null);
   }
 
   async function startLearning() {
@@ -322,8 +357,27 @@ export function LearningWorkspace({
         })}
       </div>
 
-      {selectedTrack && (
-        <section className="learning-stage" aria-live="polite">
+      {selectedTrack && selectedCourse && (
+        <div className="learning-room-overlay">
+          <section
+            className="learning-room"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selectedCourse.name} Learning Room`}
+            ref={roomRef}
+            tabIndex={-1}
+          >
+            <header className="learning-room-bar">
+              <button type="button" disabled={roomLocked} onClick={closeRoom}>
+                <span aria-hidden="true">←</span> Back to classes
+              </button>
+              <div>
+                <span>Learning Room</span>
+                <strong>{selectedCourse.name}</strong>
+              </div>
+              <small>Private by default · no grades</small>
+            </header>
+            <section className="learning-stage" aria-live="polite">
           <div className="learning-stage-heading">
             <div>
               <span className="source-chip">{selectedTrack.mission.source.label}</span>
@@ -457,7 +511,9 @@ export function LearningWorkspace({
               </div>
             </aside>
           )}
-        </section>
+            </section>
+          </section>
+        </div>
       )}
     </section>
   );

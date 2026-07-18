@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 
 import type { CourseId } from "../../lib/domain/learning-tracks";
 import { LearningWorkspace } from "./learning-workspace";
+import { SourceConnections, type ConnectedCourse } from "./source-connections";
 
 interface Student {
   name: string;
@@ -284,6 +285,7 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
   const [status, setStatus] = useState<"ready" | "starting" | "active" | "error">("ready");
   const [error, setError] = useState("");
   const [csrfToken, setCsrfToken] = useState("");
+  const [connectedCourses, setConnectedCourses] = useState<ConnectedCourse[]>([]);
   const [planStatus, setPlanStatus] = useState<"idle" | "building" | "ready" | "error">("idle");
   const [planError, setPlanError] = useState("");
   const [morningPlan, setMorningPlan] = useState<MorningPlanResponse | null>(null);
@@ -326,6 +328,10 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
       }
     : bandCamp;
   const guardianView = guardianPublished?.view ?? guardianPreview?.preview;
+  const displayedCourses = courses.map((course) => ({
+    ...course,
+    name: connectedCourses.find((connected) => connected.trackCourseId === course.id)?.name ?? course.name
+  }));
 
   async function startDemo() {
     setStatus("starting");
@@ -1017,7 +1023,9 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                 <small className="progress-copy">{practiceStatus === "complete" ? "2 of 3 ready" : "1 of 3 ready"}</small>
               </section>
 
-              <LearningWorkspace courses={courses} csrfToken={csrfToken} />
+              <SourceConnections csrfToken={csrfToken} onCoursesChanged={setConnectedCourses} />
+
+              <LearningWorkspace courses={displayedCourses} csrfToken={csrfToken} />
 
               <section className="guardian-card card">
                 <div className="guardian-icon"><Icon name="shield" /></div>

@@ -9,6 +9,11 @@ interface WorkerBindingsLike {
   ASSETS?: { fetch(request: Request): Promise<Response> | Response };
   HOMEROOM_DB?: unknown;
   SESSION_SIGNING_SECRET?: string;
+  OPENAI_API_KEY?: string;
+  SOURCE_TOKEN_ENCRYPTION_KEY?: string;
+  GOOGLE_CLASSROOM_CLIENT_ID?: string;
+  GOOGLE_CLASSROOM_CLIENT_SECRET?: string;
+  GOOGLE_CLASSROOM_REDIRECT_URI?: string;
 }
 
 const worker = {

@@ -3,5 +3,9 @@ declare module "cloudflare:workers" {
     HOMEROOM_DB: import("./lib/storage/session-store").D1DatabaseLike;
     SESSION_SIGNING_SECRET?: string;
     OPENAI_API_KEY?: string;
+    SOURCE_TOKEN_ENCRYPTION_KEY?: string;
+    GOOGLE_CLASSROOM_CLIENT_ID?: string;
+    GOOGLE_CLASSROOM_CLIENT_SECRET?: string;
+    GOOGLE_CLASSROOM_REDIRECT_URI?: string;
   };
 }

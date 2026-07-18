@@ -39,7 +39,9 @@ Learning is now a second independent product track, not a one-question extension
 - Art I — observation before interpretation;
 - Spanish I — conversational retrieval.
 
-Each course has an allowlisted readiness mission, objective, source label, and subject-specific coaching mode. The current missions are explicitly labeled **Homeroom readiness mission**; the application never claims they came from a teacher or school. This makes the Learning experience useful before live school coursework is available while preserving the seam for a later read-only Google Classroom adapter.
+Each course has an allowlisted readiness mission, objective, source label, and subject-specific coaching mode. The current missions are explicitly labeled **Homeroom readiness mission**; the application never claims they came from a teacher or school. When Google Classroom is connected, the class hub uses the live Classroom name for every deterministic subject match while the readiness mission remains clearly Homeroom-authored. Unrecognized classes stay visible as **track mapping needed** instead of being guessed by a model.
+
+The class grid is a navigation hub. Selecting a class opens a dedicated, full-screen **Learning Room** with focus transfer, a clear return path, keyboard Escape support during setup, and exit protection while the live coach is working. This keeps timeboxed dialogue, learner memory, and progress separate from the day dashboard instead of expanding an increasingly long card in place.
 
 Emily chooses a 10, 15, or 20 minute timebox and an explicit support preference before opening the live coach. The server—not the model—owns the clock and advances the session through check-in, diagnostic, guided practice, transfer, and recap. Each model turn asks one next question and keeps the work with Emily. She can continue for multiple turns, end early, or let the last two minutes force a recap. Ending without answering does not inflate objective progress.
 
@@ -96,6 +98,19 @@ npm run dev
 
 Set a random `SESSION_SIGNING_SECRET` of at least 32 characters in `.dev.vars`. Add `OPENAI_API_KEY` only when exercising a live model turn. Secrets and local D1 state are ignored by Git.
 
+For live read-only sources, also set:
+
+```dotenv
+SOURCE_TOKEN_ENCRYPTION_KEY=a-different-random-secret-at-least-32-characters
+GOOGLE_CLASSROOM_CLIENT_ID=your-google-oauth-web-client-id
+GOOGLE_CLASSROOM_CLIENT_SECRET=your-google-oauth-web-client-secret
+GOOGLE_CLASSROOM_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
+```
+
+In Google Cloud, enable the Classroom API, configure the OAuth consent screen, add Emily's Google account as a test user while the app remains in testing, and register the exact redirect URI above on a **Web application** OAuth client. The application requests only `classroom.courses.readonly` and `classroom.coursework.me.readonly`.
+
+For BAND, open the band's Calendar, choose **Manage Events → Export Band Calendars**, copy the private iCal subscription URL, and paste it into Homeroom's source panel. Treat that URL like a password. Homeroom encrypts it at rest and never returns it to the browser after connection.
+
 Useful checks:
 
 ```bash
@@ -108,15 +123,30 @@ npm run build
 npm run security
 ```
 
-## Source integration plan
+## Read-only school sources
 
-The golden demo begins with deterministic fixture adapters so the judge experience cannot be broken by school permissions or event drift. The same normalized source interfaces are the seam for:
+The source layer is operational and deliberately separate from the deterministic Golden fallback.
 
-- a read-only Google Classroom OAuth adapter for courses, coursework, and due dates;
-- a BAND calendar subscription adapter when a team calendar feed is available;
-- controlled fixture replay for the recorded video and on-stage fallback.
+Google Classroom uses the OAuth web-server flow with one-time hashed state, PKCE S256, an offline refresh token encrypted with AES-GCM, and a ten-minute callback-only session cookie. On connect or refresh, Homeroom:
 
-External school systems remain read-only in this prototype. Plans, practice results, approvals, and guardian projections are Homeroom-owned records.
+1. lists Emily's active courses with `studentId=me`;
+2. reads only published coursework for each course;
+3. reads only Emily's own submission state with `userId=me`;
+4. normalizes those records into D1 in one atomic snapshot;
+5. maps recognized course names to the seven Learning tracks with deterministic application rules; and
+6. returns only public class, coursework, event, connection-status, and last-sync fields to the browser.
+
+BAND's current Open API does not expose calendar events, so Homeroom uses BAND's official exported iCal subscription instead of scraping or pretending a calendar API exists. The fetcher accepts only HTTPS `band.us` hosts, rejects credentials and nonstandard ports, manually revalidates every redirect, limits payload and event counts, parses timed and all-day events, and stores the private feed URL only as encrypted ciphertext.
+
+The current UI refreshes both sources on explicit student action and synchronizes immediately after connection. A production deployment can invoke the same idempotent sync service from a scheduled worker and refresh stale snapshots when the student opens Homeroom. Provider data remains read-only: Homeroom never posts, edits, submits, grades, or RSVPs. Plans, learner continuity, approvals, and guardian projections remain Homeroom-owned records.
+
+Official provider references:
+
+- [Google Classroom authorization scopes](https://developers.google.com/workspace/classroom/guides/auth)
+- [Google Classroom courses.list](https://developers.google.com/workspace/classroom/reference/rest/v1/courses/list)
+- [Google Classroom coursework list](https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWork/list)
+- [Google Classroom student submissions list](https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWork.studentSubmissions/list)
+- [BAND calendar export instructions](https://help.mobilecore.naver.com/help/viewHelp.nhn?countryCode=EN&helpNo=1095&languageCode=en&serviceCode=band)
 
 ## Project documents
 
