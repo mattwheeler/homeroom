@@ -19,6 +19,12 @@ The demo is a single rehearsable contract:
 
 All names and school records in the repository are fictional fixtures. No real student data is required for the submission demo.
 
+### Demo sequence versus product navigation
+
+The numbered Golden Experience is a deterministic judge script, not the intended navigation model for Homeroom. Its linear state machine makes every source change, approval, model turn, and write reproducible in a short demo and prevents stale or out-of-order evidence from weakening the final proof.
+
+In the product, planning, learning, and guardian tasks are separate tracks. Emily should be able to open Algebra without first saving a morning plan, and a physical-form reminder should be available without completing tutoring. Only a genuinely derived action stays dependent—for example, a guardian summary cannot claim that practice is complete until practice is actually complete. The prototype keeps the submission path narrow for reliability; the post-demo architecture should replace the single phase enum with independent capability states while preserving the same approval and audit guarantees.
+
 ## Technical foundation
 
 - Next.js 16 application surface running on Vinext and Cloudflare Workers
@@ -50,6 +56,8 @@ Emily chooses the first transformation and enters the final value herself. Both 
 After practice, **Preview for Matt** builds a deterministic, server-owned guardian projection from an explicit allowlist. The preview contains the band-camp schedule, saved Plan V2 times, the fact that one Algebra I refresher was completed, and Matt's physical-form task. It deliberately excludes Emily's answer, step-by-step work, attempt count, hint count, and private coaching. No model writes or summarizes the guardian view, and the browser cannot submit replacement projection content.
 
 Emily sees the exact guardian view and a visible **Not shared yet** boundary before any publish occurs. **Approve and share with Matt** sends only an action ID and one-time receipt. The server revalidates the stored projection and its SHA-256 hash, then atomically saves projection V1, consumes the approval, advances the session to `GUARDIAN_PUBLISHED`, and records `GUARDIAN_SUMMARY_PUBLISHED` audit evidence. The successful response returns that same stored view so Emily can confirm exactly what was shared.
+
+Finally, **Open judge proof** advances the demo to `COMPLETE` and assembles a privacy-safe evidence ledger from D1. It shows the six authoritative transitions, three completed GPT-5.6 Sol traces, allowlisted source manifest, approval/hash evidence, and an integrity hash. The query layer extracts only approved audit fields and model metadata; raw model output, answers, worked steps, attempt counts, and hint counts never enter the proof response. Reopening the completed proof is idempotent and does not add another state transition or audit event.
 
 ## Local setup
 

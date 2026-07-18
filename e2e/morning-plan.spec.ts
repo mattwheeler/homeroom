@@ -278,6 +278,47 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
       })
     });
   });
+  const proofView = {
+    contractVersion: 1,
+    headline: "Golden Experience verified",
+    session: {
+      id: "session_01", student: "Emily", fixture: "Fictional Build Week data",
+      phase: "COMPLETE", stateVersion: 15, sourceVersion: 2, activePlanVersion: 2
+    },
+    scorecard: {
+      liveModelTurns: 3, auditedTransitions: 6, approvedWrites: 3, privateLearningDetailsExposed: 0
+    },
+    sources: [
+      { name: "BAND calendar", recordId: "event_band_camp_day_1", version: 2, status: "verified" },
+      { name: "Band packing list", recordId: "material_band_camp_packing", version: 1, status: "verified" },
+      { name: "Algebra I practice", recordId: "linear_equation_01", version: 1, status: "verified" },
+      { name: "Guardian task", recordId: "guardian_action_physical_form", version: 1, status: "verified" }
+    ],
+    timeline: [
+      { sequence: 1, label: "Emily approved Plan V1", actor: "Emily", stateVersion: 7, createdAt: "2026-07-18T12:06:00.000Z", proof: "Receipt-bound approval · args aaaaaaaa…" },
+      { sequence: 2, label: "BAND source advanced to V2", actor: "BAND fixture", stateVersion: 8, createdAt: "2026-07-18T12:07:00.000Z", proof: "Controlled source transition" },
+      { sequence: 3, label: "Emily approved Plan V2", actor: "Emily", stateVersion: 10, createdAt: "2026-07-18T12:09:00.000Z", proof: "Receipt-bound approval · args bbbbbbbb…" },
+      { sequence: 4, label: "Algebra practice completed", actor: "Emily", stateVersion: 12, createdAt: "2026-07-18T12:12:00.000Z", proof: "Deterministic grader · private work excluded" },
+      { sequence: 5, label: "Guardian-safe view published", actor: "Emily", stateVersion: 14, createdAt: "2026-07-18T12:14:00.000Z", proof: "Projection dddddddd… · 5 private fields excluded" },
+      { sequence: 6, label: "Judge proof opened", actor: "Emily", stateVersion: 15, createdAt: "2026-07-18T12:15:00.000Z", proof: "Read-only evidence view" }
+    ],
+    aiTurns: [
+      { stage: "morning_plan", label: "Morning plan", model: "gpt-5.6-sol-2026-07-15", status: "completed", responseIds: ["resp_plan_1", "resp_plan_2"], tools: ["get_morning_plan_context"], latencyMs: 8100, usage: { inputTokens: 900, outputTokens: 180, cachedTokens: 100 }, createdAt: "2026-07-18T12:05:00.000Z" },
+      { stage: "plan_revision", label: "Source-change revision", model: "gpt-5.6-sol-2026-07-15", status: "completed", responseIds: ["resp_revision_1", "resp_revision_2"], tools: ["get_plan_revision_context"], latencyMs: 7600, usage: { inputTokens: 820, outputTokens: 165, cachedTokens: 80 }, createdAt: "2026-07-18T12:08:00.000Z" },
+      { stage: "learning_hint", label: "Socratic Algebra hint", model: "gpt-5.6-sol-2026-07-15", status: "completed", responseIds: ["resp_hint_1", "resp_hint_2"], tools: ["get_practice_exercise"], latencyMs: 3900, usage: { inputTokens: 610, outputTokens: 95, cachedTokens: 40 }, createdAt: "2026-07-18T12:10:00.000Z" }
+    ],
+    privacy: {
+      keptPrivate: ["answers", "step-by-step work", "attempt and hint counts", "private coaching content"],
+      guardianProjection: "Server-built allowlist",
+      modelStorage: "store: false"
+    },
+    integrity: { proofHash: "e".repeat(64), generatedAt: "2026-07-18T12:15:00.000Z" }
+  };
+  await page.route("**/api/proof/open", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    expect(route.request().postDataJSON()).toEqual({});
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(proofView) });
+  });
 
   await page.goto("/");
   await page.getByRole("button", { name: "Start my day" }).click();
@@ -324,4 +365,14 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
   await page.getByRole("button", { name: "Approve and share with Matt" }).click();
   await expect(guardianPreview.getByText("Shared with Matt", { exact: true })).toBeVisible();
   await expect(guardianPreview.getByText("STATE 14", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open judge proof" }).click();
+  const proof = page.locator(".proof-view");
+  await expect(proof.getByRole("heading", { name: "Golden Experience verified" })).toBeVisible();
+  await expect(proof.getByText("STATE 15 · COMPLETE", { exact: true })).toBeVisible();
+  await expect(proof.getByText("3 LIVE GPT TURNS", { exact: true })).toBeVisible();
+  await expect(proof.getByText("get_morning_plan_context", { exact: true })).toBeVisible();
+  await expect(proof.getByText("Guardian-safe view published", { exact: true })).toBeVisible();
+  await expect(proof.getByText("Private learning details exposed", { exact: true })).toBeVisible();
+  await expect(proof).not.toContainText("x = 4");
+  await expect(proof).not.toContainText("2 attempts");
 });

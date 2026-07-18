@@ -197,6 +197,52 @@ interface GuardianPublishedResponse {
   };
 }
 
+interface ProofViewResponse {
+  contractVersion: 1;
+  headline: "Golden Experience verified";
+  session: {
+    id: string;
+    student: "Emily";
+    fixture: "Fictional Build Week data";
+    phase: "COMPLETE";
+    stateVersion: 15;
+    sourceVersion: 2;
+    activePlanVersion: 2;
+  };
+  scorecard: {
+    liveModelTurns: number;
+    auditedTransitions: number;
+    approvedWrites: number;
+    privateLearningDetailsExposed: 0;
+  };
+  sources: ReadonlyArray<{ name: string; recordId: string; version: number; status: "verified" }>;
+  timeline: Array<{
+    sequence: number;
+    label: string;
+    actor: string;
+    stateVersion: number;
+    createdAt: string;
+    proof: string;
+  }>;
+  aiTurns: Array<{
+    stage: string;
+    label: string;
+    model: string;
+    status: "completed" | "failed";
+    responseIds: string[];
+    tools: string[];
+    latencyMs: number;
+    usage: { inputTokens: number; outputTokens: number; cachedTokens: number };
+    createdAt: string;
+  }>;
+  privacy: {
+    keptPrivate: readonly string[];
+    guardianProjection: "Server-built allowlist";
+    modelStorage: "store: false";
+  };
+  integrity: { proofHash: string; generatedAt: string };
+}
+
 function displayClock(time: string): string {
   const [hours, minutes] = time.split(":").map(Number);
   const suffix = (hours ?? 0) >= 12 ? "PM" : "AM";
@@ -251,6 +297,9 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
   const [guardianPublishStatus, setGuardianPublishStatus] = useState<"idle" | "publishing" | "published" | "error">("idle");
   const [guardianPublishError, setGuardianPublishError] = useState("");
   const [guardianPublished, setGuardianPublished] = useState<GuardianPublishedResponse | null>(null);
+  const [proofStatus, setProofStatus] = useState<"idle" | "opening" | "ready" | "error">("idle");
+  const [proofError, setProofError] = useState("");
+  const [judgeProof, setJudgeProof] = useState<ProofViewResponse | null>(null);
   const displayedBandCamp = planRevision
     ? {
         wake: planRevision.revision.plan.steps[0]!.time,
@@ -529,6 +578,31 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
     } catch (caught) {
       setGuardianPublishError(caught instanceof Error ? caught.message : "Unable to share the approved view with Matt.");
       setGuardianPublishStatus("error");
+    }
+  }
+
+  async function openJudgeProof() {
+    if (!csrfToken || !guardianPublished) return;
+    setProofStatus("opening");
+    setProofError("");
+    try {
+      const response = await fetch("/api/proof/open", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: "{}"
+      });
+      const data = (await response.json()) as ProofViewResponse | { error?: { message?: string } };
+      if (!response.ok || !("headline" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to open the judge proof.");
+      }
+      setJudgeProof(data);
+      setProofStatus("ready");
+    } catch (caught) {
+      setProofError(caught instanceof Error ? caught.message : "Unable to open the judge proof.");
+      setProofStatus("error");
     }
   }
 
@@ -982,7 +1056,17 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                         <>
                           <span className="saved-check">✓</span>
                           <div><strong>Shared with Matt</strong><small>Only the exact preview above was published.</small></div>
-                          <span className="guardian-state">STATE {guardianPublished.proof.stateVersion}</span>
+                          <div className="guardian-published-actions">
+                            <span className="guardian-state">STATE {guardianPublished.proof.stateVersion}</span>
+                            <button
+                              className="proof-open-button"
+                              disabled={proofStatus === "opening" || proofStatus === "ready"}
+                              onClick={openJudgeProof}
+                            >
+                              {proofStatus === "opening" ? "Building proof…" : proofStatus === "ready" ? "Proof open" : "Open judge proof"}
+                              {proofStatus === "idle" || proofStatus === "error" ? <Icon name="arrow" /> : null}
+                            </button>
+                          </div>
                         </>
                       ) : (
                         <>
@@ -1002,6 +1086,7 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                       )}
                     </div>
                     {guardianPublishError && <p className="guardian-error" role="alert">{guardianPublishError}</p>}
+                    {proofError && <p className="guardian-error" role="alert">{proofError}</p>}
                     <div className="guardian-proof-row">
                       <span>SERVER-BUILT ALLOWLIST · PROJECTION V1</span>
                       <span>HASH {guardianPreview.proof.projectionHash.slice(0, 10)}…</span>
@@ -1009,6 +1094,97 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                   </section>
                 )}
               </section>
+
+              {judgeProof && (
+                <section className="proof-view card" aria-live="polite">
+                  <header className="proof-hero">
+                    <div>
+                      <p className="eyebrow">JUDGE EVIDENCE · GOLDEN EXPERIENCE CONTRACT V{judgeProof.contractVersion}</p>
+                      <h2>{judgeProof.headline}</h2>
+                      <p>One fictional student journey. Every source, model turn, approval, and write is traceable.</p>
+                    </div>
+                    <span className="proof-complete-badge"><span className="proof-badge-check">✓</span><span>STATE 15 · COMPLETE</span></span>
+                  </header>
+
+                  <div className="proof-scorecard">
+                    <article><strong>{judgeProof.scorecard.liveModelTurns}</strong><span>{judgeProof.scorecard.liveModelTurns} LIVE GPT TURNS</span><small>Structured, tool-backed responses</small></article>
+                    <article><strong>{judgeProof.scorecard.auditedTransitions}</strong><span>{judgeProof.scorecard.auditedTransitions} AUDITED TRANSITIONS</span><small>Immutable sequence in D1</small></article>
+                    <article><strong>{judgeProof.scorecard.approvedWrites}</strong><span>{judgeProof.scorecard.approvedWrites} APPROVED WRITES</span><small>Exact args + one-time receipts</small></article>
+                    <article className="privacy-score"><strong>{judgeProof.scorecard.privateLearningDetailsExposed}</strong><span>Private learning details exposed</span><small>Answers and coaching remain private</small></article>
+                  </div>
+
+                  <div className="proof-columns">
+                    <section className="proof-ledger">
+                      <div className="proof-section-heading"><p className="eyebrow">AUDIT LEDGER</p><span>VERIFIED SEQUENCE</span></div>
+                      <ol>
+                        {judgeProof.timeline.map((entry) => (
+                          <li key={entry.sequence}>
+                            <span className="ledger-sequence">{String(entry.sequence).padStart(2, "0")}</span>
+                            <div>
+                              <strong>{entry.label}</strong>
+                              <small>{entry.actor} · STATE {entry.stateVersion}</small>
+                              <p>{entry.proof}</p>
+                            </div>
+                            <time>{new Date(entry.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+
+                    <section className="proof-ai-traces">
+                      <div className="proof-section-heading"><p className="eyebrow">OPENAI RESPONSES API</p><span>CONTENT NOT STORED</span></div>
+                      <div className="ai-trace-list">
+                        {judgeProof.aiTurns.map((turn, index) => (
+                          <article key={turn.stage}>
+                            <div className="ai-trace-title">
+                              <span>{index + 1}</span>
+                              <div><strong>{turn.label}</strong><small>{turn.model}</small></div>
+                              <span className="trace-status"><span className="live-dot" /> {turn.status}</span>
+                            </div>
+                            <div className="tool-chip-row">
+                              {turn.tools.map((tool) => <span key={tool}>{tool}</span>)}
+                            </div>
+                            <code className="trace-response-id">RESP {turn.responseIds.at(-1)}</code>
+                            <div className="trace-metrics">
+                              <span>{turn.responseIds.length} response IDs</span>
+                              <span>{(turn.latencyMs / 1000).toFixed(1)}s</span>
+                              <span>{turn.usage.inputTokens + turn.usage.outputTokens} tokens</span>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+
+                  <section className="proof-trust-boundary">
+                    <div>
+                      <span className="privacy-shield"><Icon name="shield" /></span>
+                      <div><p className="eyebrow">PRIVACY PROOF</p><strong>Evidence without Emily&apos;s private work</strong></div>
+                    </div>
+                    <ul>{judgeProof.privacy.keptPrivate.map((item) => <li key={item}>✓ {item}</li>)}</ul>
+                    <div className="proof-policy"><span>{judgeProof.privacy.guardianProjection}</span><span>OpenAI {judgeProof.privacy.modelStorage}</span></div>
+                  </section>
+
+                  <section className="proof-sources">
+                    <div className="proof-section-heading"><p className="eyebrow">SOURCE MANIFEST</p><span>{judgeProof.sources.length} ALLOWLISTED RECORDS</span></div>
+                    <div>
+                      {judgeProof.sources.map((source) => (
+                        <article key={source.recordId}>
+                          <span className="source-verified">✓</span>
+                          <div><strong>{source.name}</strong><small>{source.recordId}</small></div>
+                          <span>V{source.version}</span>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  <footer className="proof-integrity">
+                    <span>SHA-256 PROOF</span>
+                    <code>{judgeProof.integrity.proofHash}</code>
+                    <span>Fictional data · generated {new Date(judgeProof.integrity.generatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+                  </footer>
+                </section>
+              )}
             </div>
           )}
         </section>
