@@ -8,7 +8,7 @@
     {
       "binding": "HOMEROOM_DB",
       "database_name": "homeroom-build-week",
-      "database_id": "00000000-0000-4000-8000-000000000000",
+      "database_id": "1f5904e9-631a-4d82-9b82-a35efe8d4743",
       "migrations_dir": "migrations"
     }
   ]
