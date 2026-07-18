@@ -31,9 +31,9 @@ All names and school records in the repository are fictional fixtures. No real s
 
 The AI loop uses low reasoning effort, low verbosity, `store: false`, a four-round tool ceiling, and preserves complete response output items and tool call IDs across continuations. The model can propose and explain; the application remains authoritative for permissions, state transitions, source diffs, math grading, and writes.
 
-## Live Golden Experience slice
+## Live Golden Experience
 
-The first three Golden Experience interactions are live end to end. After Emily starts a signed demo session, **Build my morning plan** calls `gpt-5.6-sol` through the OpenAI Responses API. The model must use one strict, read-only `get_morning_plan_context` function before returning a structured proposal.
+The Golden Experience through guardian publishing is live end to end. After Emily starts a signed demo session, **Build my morning plan** calls `gpt-5.6-sol` through the OpenAI Responses API. The model must use one strict, read-only `get_morning_plan_context` function before returning a structured proposal.
 
 The server—not the model—enforces the authenticated session, student role, same-origin and CSRF checks, fixture allowlist, source version, exact timeline values, and request limits. Each turn records the returned model name, OpenAI response IDs, tool call ID, latency, and token usage in D1 for the judge proof view. API requests use `store: false` and a hashed safety identifier; the OpenAI key never reaches the browser.
 
@@ -46,6 +46,10 @@ Source sync, model generation, proposal staging, and approval are distinct bound
 Once Plan V2 is active, **Start Algebra refresher** opens a live, hint-led exercise for `3(x + 2) = 18`. GPT-5.6 Sol must use the read-only `get_practice_exercise` tool and return one structured Socratic prompt about inverse operations. The tool context deliberately excludes the intermediate equation and final answer, and application validation rejects any model output that reveals either one.
 
 Emily chooses the first transformation and enters the final value herself. Both responses are graded by deterministic Homeroom code—not by the model. The server reveals `x + 2 = 6` only after the first operation is verified, refuses out-of-order completion, keeps incorrect-answer responses answer-free, and advances the authoritative session only after the final value is correct. D1 stores the private practice result, validated steps, attempts, hint count, completion timestamp, and one audit event.
+
+After practice, **Preview for Matt** builds a deterministic, server-owned guardian projection from an explicit allowlist. The preview contains the band-camp schedule, saved Plan V2 times, the fact that one Algebra I refresher was completed, and Matt's physical-form task. It deliberately excludes Emily's answer, step-by-step work, attempt count, hint count, and private coaching. No model writes or summarizes the guardian view, and the browser cannot submit replacement projection content.
+
+Emily sees the exact guardian view and a visible **Not shared yet** boundary before any publish occurs. **Approve and share with Matt** sends only an action ID and one-time receipt. The server revalidates the stored projection and its SHA-256 hash, then atomically saves projection V1, consumes the approval, advances the session to `GUARDIAN_PUBLISHED`, and records `GUARDIAN_SUMMARY_PUBLISHED` audit evidence. The successful response returns that same stored view so Emily can confirm exactly what was shared.
 
 ## Local setup
 

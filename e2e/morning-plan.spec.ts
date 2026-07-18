@@ -36,7 +36,7 @@ const revision = {
   }
 };
 
-test("Emily saves both plans and completes a hint-led Algebra refresher", async ({ page }) => {
+test("Emily completes the Golden privacy and guardian-sharing journey", async ({ page }) => {
   await page.route("**/api/demo-sessions", async (route) => {
     await route.fulfill({
       status: 201,
@@ -209,6 +209,75 @@ test("Emily saves both plans and completes a hint-led Algebra refresher", async 
       })
     });
   });
+  const guardianProjection = {
+    projectionVersion: 1,
+    recipient: { id: "guardian_matt", name: "Matt", relationship: "Parent" },
+    student: { id: "student_emily", name: "Emily", grade: 9 },
+    headline: "Emily is on track for band camp.",
+    shared: {
+      bandCamp: { date: "2026-08-03", checkIn: "07:15", start: "08:00" },
+      morningPlan: { planVersion: 2, wake: "06:15", leave: "06:45", status: "saved" },
+      practice: { course: "Algebra I", status: "completed", summary: "One summer refresher completed." },
+      guardianTask: {
+        label: "Complete the band physical form",
+        dueAt: "2026-07-24T17:00:00-05:00",
+        status: "needs_guardian"
+      }
+    },
+    privacy: {
+      excluded: ["Algebra answer", "step-by-step work", "attempt count", "hint count", "private coaching"]
+    },
+    generatedAt: "2026-07-18T12:13:00.000Z"
+  };
+  await page.route("**/api/guardian/preview", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    expect(route.request().postDataJSON()).toEqual({});
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        preview: guardianProjection,
+        approval: {
+          actionId: "action_333333333333333333333333",
+          receipt: "guardian-receipt-value-long-enough",
+          expiresAt: "2026-07-18T12:18:00.000Z",
+          projectionVersion: 1,
+          stateVersion: 13
+        },
+        proof: {
+          projectionHash: "c".repeat(64),
+          sourceVersion: 2,
+          activePlanVersion: 2,
+          privateFieldCount: 5
+        }
+      })
+    });
+  });
+  await page.route("**/api/guardian/publish", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    expect(route.request().postDataJSON()).toEqual({
+      actionId: "action_333333333333333333333333",
+      receipt: "guardian-receipt-value-long-enough"
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        published: true,
+        projectionVersion: 1,
+        phase: "GUARDIAN_PUBLISHED",
+        publishedAt: "2026-07-18T12:14:00.000Z",
+        recipient: "Matt",
+        view: guardianProjection,
+        proof: {
+          approvalId: "action_333333333333333333333333",
+          argsHash: "d".repeat(64),
+          projectionHash: "c".repeat(64),
+          stateVersion: 14
+        }
+      })
+    });
+  });
 
   await page.goto("/");
   await page.getByRole("button", { name: "Start my day" }).click();
@@ -244,4 +313,15 @@ test("Emily saves both plans and completes a hint-led Algebra refresher", async 
   await expect(page.getByText("Practice complete", { exact: true })).toBeVisible();
   await expect(page.getByText("You solved it one step at a time.", { exact: true })).toBeVisible();
   await expect(page.getByText("Deterministically graded · 2 attempts · 1 hint", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Preview for Matt" }).click();
+  const guardianPreview = page.locator(".guardian-preview");
+  await expect(guardianPreview.getByRole("heading", { name: "Exactly what Matt will see" })).toBeVisible();
+  await expect(guardianPreview.getByText("Not shared yet", { exact: true })).toBeVisible();
+  await expect(guardianPreview.getByText("Algebra answer", { exact: true })).toBeVisible();
+  await expect(guardianPreview.getByText("private coaching", { exact: true })).toBeVisible();
+  await expect(guardianPreview).not.toContainText("x = 4");
+  await expect(guardianPreview).not.toContainText("2 attempts");
+  await page.getByRole("button", { name: "Approve and share with Matt" }).click();
+  await expect(guardianPreview.getByText("Shared with Matt", { exact: true })).toBeVisible();
+  await expect(guardianPreview.getByText("STATE 14", { exact: true })).toBeVisible();
 });

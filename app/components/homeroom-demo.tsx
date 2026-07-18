@@ -150,6 +150,53 @@ interface PracticeCompleteResponse {
   };
 }
 
+interface GuardianProjection {
+  projectionVersion: 1;
+  recipient: { id: string; name: "Matt"; relationship: "Parent" };
+  student: { id: string; name: "Emily"; grade: 9 };
+  headline: string;
+  shared: {
+    bandCamp: { date: string; checkIn: string; start: string };
+    morningPlan: { planVersion: 2; wake: string; leave: string; status: "saved" };
+    practice: { course: "Algebra I"; status: "completed"; summary: string };
+    guardianTask: { label: string; dueAt: string; status: "needs_guardian" };
+  };
+  privacy: { excluded: [string, string, string, string, string] };
+  generatedAt: string;
+}
+
+interface GuardianPreviewResponse {
+  preview: GuardianProjection;
+  approval: {
+    actionId: string;
+    receipt: string;
+    expiresAt: string;
+    projectionVersion: 1;
+    stateVersion: number;
+  };
+  proof: {
+    projectionHash: string;
+    sourceVersion: 2;
+    activePlanVersion: 2;
+    privateFieldCount: number;
+  };
+}
+
+interface GuardianPublishedResponse {
+  published: true;
+  projectionVersion: 1;
+  phase: "GUARDIAN_PUBLISHED";
+  publishedAt: string;
+  recipient: "Matt";
+  view: GuardianProjection;
+  proof: {
+    approvalId: string;
+    argsHash: string;
+    projectionHash: string;
+    stateVersion: number;
+  };
+}
+
 function displayClock(time: string): string {
   const [hours, minutes] = time.split(":").map(Number);
   const suffix = (hours ?? 0) >= 12 ? "PM" : "AM";
@@ -198,6 +245,12 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
   const [practiceAttemptStatus, setPracticeAttemptStatus] = useState<"idle" | "checking">("idle");
   const [finalAnswer, setFinalAnswer] = useState("");
   const [practiceComplete, setPracticeComplete] = useState<PracticeCompleteResponse | null>(null);
+  const [guardianStatus, setGuardianStatus] = useState<"idle" | "preparing" | "ready" | "error">("idle");
+  const [guardianError, setGuardianError] = useState("");
+  const [guardianPreview, setGuardianPreview] = useState<GuardianPreviewResponse | null>(null);
+  const [guardianPublishStatus, setGuardianPublishStatus] = useState<"idle" | "publishing" | "published" | "error">("idle");
+  const [guardianPublishError, setGuardianPublishError] = useState("");
+  const [guardianPublished, setGuardianPublished] = useState<GuardianPublishedResponse | null>(null);
   const displayedBandCamp = planRevision
     ? {
         wake: planRevision.revision.plan.steps[0]!.time,
@@ -206,6 +259,7 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
         start: bandCamp.start
       }
     : bandCamp;
+  const guardianView = guardianPublished?.view ?? guardianPreview?.preview;
 
   async function startDemo() {
     setStatus("starting");
@@ -419,6 +473,62 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
       setPracticeError(caught instanceof Error ? caught.message : "Unable to check your answer.");
     } finally {
       setPracticeAttemptStatus("idle");
+    }
+  }
+
+  async function previewForMatt() {
+    if (!csrfToken || !practiceComplete) return;
+    setGuardianStatus("preparing");
+    setGuardianError("");
+    setGuardianPublishStatus("idle");
+    setGuardianPublishError("");
+    setGuardianPublished(null);
+    try {
+      const response = await fetch("/api/guardian/preview", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: "{}"
+      });
+      const data = (await response.json()) as GuardianPreviewResponse | { error?: { message?: string } };
+      if (!response.ok || !("preview" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to prepare Matt's preview.");
+      }
+      setGuardianPreview(data);
+      setGuardianStatus("ready");
+    } catch (caught) {
+      setGuardianError(caught instanceof Error ? caught.message : "Unable to prepare Matt's preview.");
+      setGuardianStatus("error");
+    }
+  }
+
+  async function publishForMatt() {
+    if (!csrfToken || !guardianPreview) return;
+    setGuardianPublishStatus("publishing");
+    setGuardianPublishError("");
+    try {
+      const response = await fetch("/api/guardian/publish", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: JSON.stringify({
+          actionId: guardianPreview.approval.actionId,
+          receipt: guardianPreview.approval.receipt
+        })
+      });
+      const data = (await response.json()) as GuardianPublishedResponse | { error?: { message?: string } };
+      if (!response.ok || !("published" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to share the approved view with Matt.");
+      }
+      setGuardianPublished(data);
+      setGuardianPublishStatus("published");
+    } catch (caught) {
+      setGuardianPublishError(caught instanceof Error ? caught.message : "Unable to share the approved view with Matt.");
+      setGuardianPublishStatus("error");
     }
   }
 
@@ -804,8 +914,100 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
 
               <section className="guardian-card card">
                 <div className="guardian-icon"><Icon name="shield" /></div>
-                <div><p className="eyebrow">NEEDS A GUARDIAN</p><h2>Band physical form</h2><p>Matt can complete this by Friday, July 24.</p></div>
-                <button className="secondary-button">Ask Matt</button>
+                <div className="guardian-card-copy">
+                  <p className="eyebrow">NEEDS A GUARDIAN</p>
+                  <h2>Band physical form</h2>
+                  <p>Matt can complete this by Friday, July 24.</p>
+                </div>
+                <button
+                  className="secondary-button"
+                  disabled={!practiceComplete || guardianStatus === "preparing" || guardianStatus === "ready"}
+                  onClick={previewForMatt}
+                >
+                  {!practiceComplete
+                    ? "Finish practice first"
+                    : guardianStatus === "preparing"
+                      ? "Preparing private preview…"
+                      : guardianStatus === "ready"
+                        ? "Preview ready"
+                        : "Preview for Matt"}
+                </button>
+                {guardianError && <p className="guardian-error" role="alert">{guardianError}</p>}
+                {guardianPreview && guardianView && (
+                  <section className="guardian-preview" aria-live="polite">
+                    <div className="guardian-preview-heading">
+                      <div>
+                        <p className="eyebrow">GUARDIAN SHARE PREVIEW</p>
+                        <h3>Exactly what Matt will see</h3>
+                        <p>{guardianView.headline}</p>
+                      </div>
+                      <span className="recipient-chip"><span>M</span> Matt · Parent</span>
+                    </div>
+
+                    <div className="guardian-safe-grid">
+                      <article>
+                        <small>BAND CAMP</small>
+                        <strong>Monday, August 3</strong>
+                        <span>{displayClock(guardianView.shared.bandCamp.checkIn)} check-in · {displayClock(guardianView.shared.bandCamp.start)} start</span>
+                      </article>
+                      <article>
+                        <small>MORNING PLAN</small>
+                        <strong>Plan V{guardianView.shared.morningPlan.planVersion} saved</strong>
+                        <span>{displayClock(guardianView.shared.morningPlan.wake)} wake · {displayClock(guardianView.shared.morningPlan.leave)} leave</span>
+                      </article>
+                      <article>
+                        <small>PRACTICE</small>
+                        <strong>{guardianView.shared.practice.course} complete</strong>
+                        <span>{guardianView.shared.practice.summary}</span>
+                      </article>
+                      <article>
+                        <small>MATT&apos;S TASK</small>
+                        <strong>Band physical form</strong>
+                        <span>Due Friday, July 24</span>
+                      </article>
+                    </div>
+
+                    <div className="guardian-privacy-boundary">
+                      <div className="privacy-heading">
+                        <span className="privacy-shield"><Icon name="shield" /></span>
+                        <div><strong>Kept private in Emily&apos;s workspace</strong><small>These details are not in Matt&apos;s view.</small></div>
+                      </div>
+                      <ul>
+                        {guardianView.privacy.excluded.map((field) => <li key={field}>{field}</li>)}
+                      </ul>
+                    </div>
+
+                    <div className={`guardian-share-boundary ${guardianPublished ? "published" : ""}`}>
+                      {guardianPublished ? (
+                        <>
+                          <span className="saved-check">✓</span>
+                          <div><strong>Shared with Matt</strong><small>Only the exact preview above was published.</small></div>
+                          <span className="guardian-state">STATE {guardianPublished.proof.stateVersion}</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="share-status">
+                            <span className="not-shared-dot" />
+                            <div><strong>Not shared yet</strong><small>Emily must approve this exact view.</small></div>
+                          </div>
+                          <button
+                            className="approve-button"
+                            disabled={guardianPublishStatus === "publishing"}
+                            onClick={publishForMatt}
+                          >
+                            {guardianPublishStatus === "publishing" ? "Sharing approved view…" : "Approve and share with Matt"}
+                            {guardianPublishStatus !== "publishing" && <Icon name="arrow" />}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {guardianPublishError && <p className="guardian-error" role="alert">{guardianPublishError}</p>}
+                    <div className="guardian-proof-row">
+                      <span>SERVER-BUILT ALLOWLIST · PROJECTION V1</span>
+                      <span>HASH {guardianPreview.proof.projectionHash.slice(0, 10)}…</span>
+                    </div>
+                  </section>
+                )}
               </section>
             </div>
           )}
