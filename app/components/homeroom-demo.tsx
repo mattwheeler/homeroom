@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useState, useSyncExternalStore } from "react";
+
+import type { CourseId } from "../../lib/domain/learning-tracks";
+import { LearningWorkspace } from "./learning-workspace";
 
 interface Student {
   name: string;
@@ -8,7 +11,7 @@ interface Student {
 }
 
 interface Course {
-  id: string;
+  id: CourseId;
   name: string;
 }
 
@@ -652,7 +655,7 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
         <div className="topbar-center">
           <span className="nav-pill active"><Icon name="spark" /> Today</span>
           <span className="nav-pill"><Icon name="calendar" /> My week</span>
-          <span className="nav-pill"><Icon name="book" /> Learn</span>
+          <a className="nav-pill" href="#learning"><Icon name="book" /> Learn</a>
         </div>
         <div className="student-chip">
           <span className="student-avatar">E</span>
@@ -1014,13 +1017,7 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                 <small className="progress-copy">{practiceStatus === "complete" ? "2 of 3 ready" : "1 of 3 ready"}</small>
               </section>
 
-              <section className="classes-card card">
-                <div className="section-heading"><div><p className="eyebrow">LOOKING AHEAD</p><h2>Your {courses.length} ninth-grade classes</h2></div><button className="icon-button" aria-label="Open classes"><Icon name="arrow" /></button></div>
-                <div className="course-cloud">
-                  {courses.map((course, index) => <span key={course.id} style={{ "--course-index": index } as CSSProperties}>{course.name}</span>)}
-                </div>
-                <p className="card-footnote">A little practice now makes August feel lighter.</p>
-              </section>
+              <LearningWorkspace courses={courses} csrfToken={csrfToken} />
 
               <section className="guardian-card card">
                 <div className="guardian-icon"><Icon name="shield" /></div>

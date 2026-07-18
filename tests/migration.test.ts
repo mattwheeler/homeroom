@@ -25,4 +25,14 @@ describe("D1 foundation migration", () => {
     expect(sql).toContain("UNIQUE (session_id, notification_type, task_record_id)");
     expect(sql).not.toMatch(/SELECT.+\$\{/s);
   });
+
+  it("adds temporary Learning dialogue and durable evidence-backed learner context", async () => {
+    const sql = await readFile(new URL("../migrations/0003_learning_continuity.sql", import.meta.url), "utf8");
+    expect(sql).toContain("CREATE TABLE learning_sessions");
+    expect(sql).toContain("CREATE TABLE learner_signals");
+    expect(sql).toContain("CREATE TABLE learning_progress");
+    expect(sql).toContain("CREATE TABLE learner_memory_events");
+    expect(sql).toContain("context_json TEXT NOT NULL");
+    expect(sql).not.toMatch(/SELECT.+\$\{/s);
+  });
 });

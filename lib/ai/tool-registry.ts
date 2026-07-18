@@ -9,6 +9,7 @@ export type ToolStage =
   | "plan_revision"
   | "plan_update"
   | "learning_hint"
+  | "learning_session"
   | "learning_complete"
   | "family_preview"
   | "guardian_view";
@@ -160,6 +161,12 @@ const schemas = {
     stringProperties("sessionId", "exerciseId"),
     z.object({ sessionId: id, exerciseId: id }).strict()
   ),
+  get_learning_session_context: defineTool(
+    "get_learning_session_context",
+    "Read one active, timeboxed Learning session with its approved mission, recent temporary dialogue, and course-scoped learner context.",
+    stringProperties("sessionId", "learningSessionId"),
+    z.object({ sessionId: id, learningSessionId: id }).strict()
+  ),
   record_practice_result: defineTool(
     "record_practice_result",
     "Record a deterministically graded private practice result.",
@@ -201,6 +208,7 @@ const stageToolNames: Record<ToolStage, readonly ToolName[]> = {
   plan_revision: ["get_plan_revision_context"],
   plan_update: ["update_personal_plan"],
   learning_hint: ["get_practice_exercise"],
+  learning_session: ["get_learning_session_context"],
   learning_complete: ["record_practice_result"],
   family_preview: ["get_guardian_projection", "publish_guardian_summary"],
   guardian_view: ["get_published_guardian_summary"]
@@ -211,7 +219,7 @@ export function getStageTools(stage: ToolStage): FunctionToolDefinition[] {
 }
 
 export function isReadOnlyStage(stage: ToolStage) {
-  return ["orientation", "morning_plan", "plan_gathering", "plan_revision", "learning_hint", "guardian_view"].includes(stage);
+  return ["orientation", "morning_plan", "plan_gathering", "plan_revision", "learning_hint", "learning_session", "guardian_view"].includes(stage);
 }
 
 export function validateToolArguments(stage: ToolStage, name: string, args: unknown): unknown {

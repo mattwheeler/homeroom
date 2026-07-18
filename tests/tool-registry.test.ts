@@ -14,6 +14,18 @@ describe("stage-scoped function tools", () => {
     });
   });
 
+  it("gives a Learning turn only its scoped session-context reader", () => {
+    const tools = getStageTools("learning_session");
+    expect(tools.map((tool) => tool.name)).toEqual(["get_learning_session_context"]);
+    expect(tools[0]).toMatchObject({
+      strict: true,
+      parameters: {
+        required: ["sessionId", "learningSessionId"],
+        additionalProperties: false
+      }
+    });
+  });
+
   it("exposes only orientation reads during orientation", () => {
     const names = getStageTools("orientation").map((tool) => tool.name);
     expect(names).toEqual([

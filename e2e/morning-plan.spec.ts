@@ -84,6 +84,133 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
     expect(route.request().postDataJSON()).toEqual({ actionId: "action_444444444444444444444444", receipt: "family-reminder-receipt-long" });
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ sent: true, notificationId: "notification_01", recipient: "Matt", channel: "Homeroom guardian inbox", sentAt: "2026-07-18T12:02:00.000Z", reminder: {}, proof: { approvalId: "action_444444444444444444444444", argsHash: "f".repeat(64), stateVersion: 5 } }) });
   });
+  await page.route("**/api/learning/context", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ courseId: "course_algebra_1" });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        signals: [],
+        progress: [],
+        policy: {
+          rawCompletedDialogueRetained: false,
+          memoryIsVisibleAndDeletable: true,
+          crossCourseContext: false
+        }
+      })
+    });
+  });
+  await page.route("**/api/learning/start", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    expect(route.request().postDataJSON()).toEqual({
+      courseId: "course_algebra_1",
+      durationMinutes: 10,
+      supportPreference: "example_first"
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        learningSession: {
+          id: "learning_123456789012345678901234",
+          courseId: "course_algebra_1",
+          durationMinutes: 10,
+          targetEndsAt: "2099-07-18T12:10:00.000Z",
+          turnCount: 0,
+          status: "active"
+        },
+        track: {
+          courseId: "course_algebra_1",
+          courseName: "Algebra I",
+          trackTitle: "Starting Strong in Algebra I",
+          coachMode: "guided_problem_solving",
+          mission: {
+            id: "readiness_algebra_balance_01",
+            title: "Equations stay balanced",
+            objectiveId: "algebra_equation_balance",
+            objective: "Explain why the same operation must be applied to both sides of an equation.",
+            activityBoundary: "Use original examples.",
+            suggestedMinutes: 10,
+            source: { kind: "homeroom_readiness", label: "Homeroom readiness mission", version: 1 }
+          }
+        },
+        turn: {
+          phase: "check_in",
+          message: "We’ll use one quick example, then you’ll take the lead.",
+          question: "When an equation changes on one side, what must happen on the other side?",
+          encouragement: "This is a starting point, not a grade.",
+          answerPolicy: "coach_not_complete"
+        },
+        timing: { targetEndsAt: "2099-07-18T12:10:00.000Z", remainingSeconds: 590, phase: "check_in" },
+        learnerContext: [],
+        proof: { independentTrack: "learning", goldenStateUnchanged: true, store: false }
+      })
+    });
+  });
+  await page.route("**/api/learning/turn", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      learningSessionId: "learning_123456789012345678901234",
+      response: "Both sides have to stay equal."
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        learningSessionId: "learning_123456789012345678901234",
+        turnCount: 1,
+        turn: {
+          phase: "diagnostic",
+          message: "Exactly—the equality has to remain true.",
+          question: "If we subtract 3 from the left side, what should we do to the right side?",
+          encouragement: "You identified the central idea.",
+          answerPolicy: "coach_not_complete"
+        },
+        timing: { targetEndsAt: "2099-07-18T12:10:00.000Z", remainingSeconds: 540, phase: "diagnostic" },
+        memoryUsed: [],
+        proof: { model: "gpt-5.6-sol-2026-07-15", store: false }
+      })
+    });
+  });
+  await page.route("**/api/learning/complete", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      learningSessionId: "learning_123456789012345678901234"
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        completed: true,
+        learningSessionId: "learning_123456789012345678901234",
+        summary: {
+          courseName: "Algebra I",
+          missionTitle: "Equations stay balanced",
+          objective: "Explain why the same operation must be applied to both sides of an equation.",
+          objectiveStatus: "exploring",
+          completedTurns: 1,
+          sourceLabel: "Homeroom readiness mission",
+          memoryStatement: "One worked example before independent practice."
+        },
+        memory: {
+          id: "signal_abcdefabcdefabcdefabcdef",
+          statement: "One worked example before independent practice.",
+          why: "Emily selected this support preference when the session began.",
+          canDelete: true
+        },
+        progress: { status: "exploring", sessionsCompleted: 1 },
+        proof: { activeDialogueDeleted: true, goldenStateUnchanged: true, goldenStateVersion: 5 }
+      })
+    });
+  });
+  await page.route("**/api/learning/context/delete", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      signalId: "signal_abcdefabcdefabcdefabcdef"
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ deleted: true })
+    });
+  });
   await page.route("**/api/morning-plan/approve", async (route) => {
     expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
     expect(route.request().postDataJSON()).toEqual({
@@ -334,6 +461,20 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
 
   await page.goto("/");
   await page.getByRole("button", { name: "Start my day" }).click();
+  await expect(page.getByRole("button", { name: /Open .* learning track/ })).toHaveCount(7);
+  await page.getByRole("button", { name: "Open Algebra I learning track" }).click();
+  await expect(page.getByRole("heading", { name: "Starting Strong in Algebra I" })).toBeVisible();
+  await page.getByRole("button", { name: "Start 10-minute session" }).click();
+  await expect(page.getByText("We’ll use one quick example, then you’ll take the lead.", { exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "Your response to Homeroom" }).fill("Both sides have to stay equal.");
+  await page.getByRole("button", { name: "Send to coach" }).click();
+  await expect(page.getByText("Exactly—the equality has to remain true.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "End and save session" }).click();
+  await expect(page.getByRole("heading", { name: "What Homeroom remembers" })).toBeVisible();
+  await expect(page.getByText("One worked example before independent practice.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Active dialogue deleted", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByRole("heading", { name: "What Homeroom remembers" })).toBeHidden();
   await page.getByRole("button", { name: "Ask Matt" }).click();
   await expect(page.getByRole("heading", { name: "Exact notification for Matt" })).toBeVisible();
   await page.getByRole("button", { name: "Approve and notify Matt" }).click();

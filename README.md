@@ -27,6 +27,26 @@ In the product, planning, learning, and guardian tasks are separate tracks. Emil
 
 The first independent product track is live. Immediately after starting a session, Emily can select **Ask Matt**, review the exact notification that will be delivered, and explicitly approve it. Homeroom persists that notification to Matt's guardian inbox, consumes the one-time approval, and writes a dedicated audit event without changing the Golden state or requiring a plan or tutoring result. The later progress summary remains a separate, optional action because it contains facts derived from completed practice.
 
+### Operational Learning continuity
+
+Learning is now a second independent product track, not a one-question extension of the Golden demo. Emily can open any of her seven upcoming classes immediately after starting her day:
+
+- English I — claims and evidence;
+- Algebra I — preserving equality;
+- Biology — scientific reasoning;
+- World Geography — reasoning from map evidence;
+- Concert and Marching Band — pulse and rhythm rehearsal;
+- Art I — observation before interpretation;
+- Spanish I — conversational retrieval.
+
+Each course has an allowlisted readiness mission, objective, source label, and subject-specific coaching mode. The current missions are explicitly labeled **Homeroom readiness mission**; the application never claims they came from a teacher or school. This makes the Learning experience useful before live school coursework is available while preserving the seam for a later read-only Google Classroom adapter.
+
+Emily chooses a 10, 15, or 20 minute timebox and an explicit support preference before opening the live coach. The server—not the model—owns the clock and advances the session through check-in, diagnostic, guided practice, transfer, and recap. Each model turn asks one next question and keeps the work with Emily. She can continue for multiple turns, end early, or let the last two minutes force a recap. Ending without answering does not inflate objective progress.
+
+Homeroom owns learner continuity as transparent structured data. During an active session, only the last eight dialogue entries are retained for bounded coaching context. Completion atomically clears that dialogue, saves a recap, updates evidence-backed course progress, and stores only the support preference Emily explicitly selected. That memory is course-scoped, expires after 90 days, is visible in **What Homeroom remembers**, and can be deleted by Emily with an audit event. Homeroom does not persist diagnoses, intelligence labels, model-inferred personality, raw completed dialogue, or unsupported mastery claims.
+
+Every Learning model call uses `gpt-5.6-sol`, one strict read-only `get_learning_session_context` tool, and `store: false`. Homeroom sends a fresh, application-built context on every turn instead of relying on provider-side conversation memory or `previous_response_id`. Learning sessions, learner signals, objective progress, and memory events have dedicated D1 tables and do not mutate the Golden plan state or Family reminder state.
+
 ## Technical foundation
 
 - Next.js 16 application surface running on Vinext and Cloudflare Workers
@@ -36,6 +56,7 @@ The first independent product track is live. Immediately after starting a sessio
 - Explicit approval receipts bound to actor, arguments, expected versions, expiry, and idempotency key
 - Signed, role-scoped, `HttpOnly` session cookies plus same-origin and CSRF controls
 - A persisted guardian inbox for independently approved family reminders
+- Seven independent, timeboxed Learning tracks with application-managed learner continuity
 - Adapter boundaries for Google Classroom and BAND/iCalendar sources
 
 The AI loop uses low reasoning effort, low verbosity, `store: false`, a four-round tool ceiling, and preserves complete response output items and tool call IDs across continuations. The model can propose and explain; the application remains authoritative for permissions, state transitions, source diffs, math grading, and writes.
