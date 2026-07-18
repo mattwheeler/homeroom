@@ -18,4 +18,11 @@ describe("D1 foundation migration", () => {
     expect(sql).toContain("idempotency_key TEXT NOT NULL UNIQUE");
     expect(sql).not.toMatch(/SELECT.+\$\{/s);
   });
+
+  it("adds a persistent guardian inbox for independent Family actions", async () => {
+    const sql = await readFile(new URL("../migrations/0002_guardian_notifications.sql", import.meta.url), "utf8");
+    expect(sql).toContain("CREATE TABLE guardian_notifications");
+    expect(sql).toContain("UNIQUE (session_id, notification_type, task_record_id)");
+    expect(sql).not.toMatch(/SELECT.+\$\{/s);
+  });
 });

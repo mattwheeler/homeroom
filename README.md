@@ -23,7 +23,9 @@ All names and school records in the repository are fictional fixtures. No real s
 
 The numbered Golden Experience is a deterministic judge script, not the intended navigation model for Homeroom. Its linear state machine makes every source change, approval, model turn, and write reproducible in a short demo and prevents stale or out-of-order evidence from weakening the final proof.
 
-In the product, planning, learning, and guardian tasks are separate tracks. Emily should be able to open Algebra without first saving a morning plan, and a physical-form reminder should be available without completing tutoring. Only a genuinely derived action stays dependent—for example, a guardian summary cannot claim that practice is complete until practice is actually complete. The prototype keeps the submission path narrow for reliability; the post-demo architecture should replace the single phase enum with independent capability states while preserving the same approval and audit guarantees.
+In the product, planning, learning, and guardian tasks are separate tracks. Emily should be able to open Algebra without first saving a morning plan, and a physical-form reminder should be available without completing tutoring. Only a genuinely derived action stays dependent—for example, a guardian summary cannot claim that practice is complete until practice is actually complete. The Golden path stays narrow for reliability while product capabilities move to independent state and storage with the same approval and audit guarantees.
+
+The first independent product track is live. Immediately after starting a session, Emily can select **Ask Matt**, review the exact notification that will be delivered, and explicitly approve it. Homeroom persists that notification to Matt's guardian inbox, consumes the one-time approval, and writes a dedicated audit event without changing the Golden state or requiring a plan or tutoring result. The later progress summary remains a separate, optional action because it contains facts derived from completed practice.
 
 ## Technical foundation
 
@@ -33,6 +35,7 @@ In the product, planning, learning, and guardian tasks are separate tracks. Emil
 - Strict, stage-scoped function tools with application-side validation
 - Explicit approval receipts bound to actor, arguments, expected versions, expiry, and idempotency key
 - Signed, role-scoped, `HttpOnly` session cookies plus same-origin and CSRF controls
+- A persisted guardian inbox for independently approved family reminders
 - Adapter boundaries for Google Classroom and BAND/iCalendar sources
 
 The AI loop uses low reasoning effort, low verbosity, `store: false`, a four-round tool ceiling, and preserves complete response output items and tool call IDs across continuations. The model can propose and explain; the application remains authoritative for permissions, state transitions, source diffs, math grading, and writes.

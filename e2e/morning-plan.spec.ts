@@ -72,6 +72,18 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
       })
     });
   });
+  await page.route("**/api/family/reminder/preview", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({});
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      preview: { title: "Band physical form needs your help", message: "Emily needs your help completing the band physical form by Friday, July 24.", task: { label: "Complete the band physical form", dueAt: "2026-07-24T17:00:00-05:00" }, recipient: { name: "Matt" } },
+      approval: { actionId: "action_444444444444444444444444", receipt: "family-reminder-receipt-long", expiresAt: "2026-07-18T12:06:00.000Z" },
+      proof: { independentTrack: "family", stateUnchanged: true, stateVersion: 5 }
+    }) });
+  });
+  await page.route("**/api/family/reminder/send", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ actionId: "action_444444444444444444444444", receipt: "family-reminder-receipt-long" });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ sent: true, notificationId: "notification_01", recipient: "Matt", channel: "Homeroom guardian inbox", sentAt: "2026-07-18T12:02:00.000Z", reminder: {}, proof: { approvalId: "action_444444444444444444444444", argsHash: "f".repeat(64), stateVersion: 5 } }) });
+  });
   await page.route("**/api/morning-plan/approve", async (route) => {
     expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
     expect(route.request().postDataJSON()).toEqual({
@@ -322,6 +334,10 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
 
   await page.goto("/");
   await page.getByRole("button", { name: "Start my day" }).click();
+  await page.getByRole("button", { name: "Ask Matt" }).click();
+  await expect(page.getByRole("heading", { name: "Exact notification for Matt" })).toBeVisible();
+  await page.getByRole("button", { name: "Approve and notify Matt" }).click();
+  await expect(page.getByText("Delivered to Matt's Homeroom inbox", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Build my morning plan" }).click();
 
   await expect(page.getByRole("heading", { name: plan.title })).toBeVisible();
@@ -354,7 +370,7 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
   await expect(page.getByText("Practice complete", { exact: true })).toBeVisible();
   await expect(page.getByText("You solved it one step at a time.", { exact: true })).toBeVisible();
   await expect(page.getByText("Deterministically graded · 2 attempts · 1 hint", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Preview for Matt" }).click();
+  await page.getByRole("button", { name: "Preview optional progress summary" }).click();
   const guardianPreview = page.locator(".guardian-preview");
   await expect(guardianPreview.getByRole("heading", { name: "Exactly what Matt will see" })).toBeVisible();
   await expect(guardianPreview.getByText("Not shared yet", { exact: true })).toBeVisible();

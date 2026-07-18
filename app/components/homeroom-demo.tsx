@@ -196,6 +196,16 @@ interface GuardianPublishedResponse {
     stateVersion: number;
   };
 }
+interface FamilyReminderPreview {
+  preview: { title: string; message: string; task: { label: string; dueAt: string }; recipient: { name: "Matt" } };
+  approval: { actionId: string; receipt: string; expiresAt: string };
+  proof: { independentTrack: "family"; stateUnchanged: true; stateVersion: number };
+}
+interface FamilyReminderSent {
+  sent: true; notificationId: string; recipient: "Matt"; channel: "Homeroom guardian inbox"; sentAt: string;
+  reminder: FamilyReminderPreview["preview"];
+  proof: { approvalId: string; argsHash: string; stateVersion: number };
+}
 
 interface ProofViewResponse {
   contractVersion: 1;
@@ -297,6 +307,10 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
   const [guardianPublishStatus, setGuardianPublishStatus] = useState<"idle" | "publishing" | "published" | "error">("idle");
   const [guardianPublishError, setGuardianPublishError] = useState("");
   const [guardianPublished, setGuardianPublished] = useState<GuardianPublishedResponse | null>(null);
+  const [familyStatus, setFamilyStatus] = useState<"idle" | "previewing" | "ready" | "sending" | "sent" | "error">("idle");
+  const [familyError, setFamilyError] = useState("");
+  const [familyPreview, setFamilyPreview] = useState<FamilyReminderPreview | null>(null);
+  const [familySent, setFamilySent] = useState<FamilyReminderSent | null>(null);
   const [proofStatus, setProofStatus] = useState<"idle" | "opening" | "ready" | "error">("idle");
   const [proofError, setProofError] = useState("");
   const [judgeProof, setJudgeProof] = useState<ProofViewResponse | null>(null);
@@ -551,6 +565,28 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
       setGuardianError(caught instanceof Error ? caught.message : "Unable to prepare Matt's preview.");
       setGuardianStatus("error");
     }
+  }
+
+  async function previewFamilyReminder() {
+    if (!csrfToken) return;
+    setFamilyStatus("previewing"); setFamilyError("");
+    try {
+      const response = await fetch("/api/family/reminder/preview", { method: "POST", headers: { "content-type": "application/json", "x-homeroom-csrf": csrfToken }, body: "{}" });
+      const data = (await response.json()) as FamilyReminderPreview | { error?: { message?: string } };
+      if (!response.ok || !("preview" in data)) throw new Error("error" in data ? data.error?.message : "Unable to prepare the reminder.");
+      setFamilyPreview(data); setFamilyStatus("ready");
+    } catch (caught) { setFamilyError(caught instanceof Error ? caught.message : "Unable to prepare the reminder."); setFamilyStatus("error"); }
+  }
+
+  async function sendFamilyReminder() {
+    if (!csrfToken || !familyPreview) return;
+    setFamilyStatus("sending"); setFamilyError("");
+    try {
+      const response = await fetch("/api/family/reminder/send", { method: "POST", headers: { "content-type": "application/json", "x-homeroom-csrf": csrfToken }, body: JSON.stringify({ actionId: familyPreview.approval.actionId, receipt: familyPreview.approval.receipt }) });
+      const data = (await response.json()) as FamilyReminderSent | { error?: { message?: string } };
+      if (!response.ok || !("sent" in data)) throw new Error("error" in data ? data.error?.message : "Unable to send the reminder.");
+      setFamilySent(data); setFamilyStatus("sent");
+    } catch (caught) { setFamilyError(caught instanceof Error ? caught.message : "Unable to send the reminder."); setFamilyStatus("error"); }
   }
 
   async function publishForMatt() {
@@ -995,18 +1031,26 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                 </div>
                 <button
                   className="secondary-button"
-                  disabled={!practiceComplete || guardianStatus === "preparing" || guardianStatus === "ready"}
-                  onClick={previewForMatt}
+                  disabled={familyStatus === "previewing" || familyStatus === "ready" || familyStatus === "sending" || familyStatus === "sent"}
+                  onClick={previewFamilyReminder}
                 >
-                  {!practiceComplete
-                    ? "Finish practice first"
-                    : guardianStatus === "preparing"
-                      ? "Preparing private preview…"
-                      : guardianStatus === "ready"
-                        ? "Preview ready"
-                        : "Preview for Matt"}
+                  {familyStatus === "previewing" ? "Preparing reminder…" : familyStatus === "sent" ? "Reminder delivered" : "Ask Matt"}
                 </button>
+                {familyPreview && (
+                  <section className="family-reminder-preview" aria-live="polite">
+                    <div><p className="eyebrow">FAMILY TRACK · INDEPENDENT ACTION</p><h3>Exact notification for Matt</h3><p>{familyPreview.preview.message}</p></div>
+                    {familySent ? (
+                      <div className="family-delivered"><span className="saved-check">✓</span><div><strong>Delivered to Matt&apos;s Homeroom inbox</strong><small>Golden demo state remained unchanged.</small></div></div>
+                    ) : (
+                      <div className="family-send-boundary"><span>Not sent yet · Emily approves the exact message</span><button className="approve-button" disabled={familyStatus === "sending"} onClick={sendFamilyReminder}>{familyStatus === "sending" ? "Sending…" : "Approve and notify Matt"}</button></div>
+                    )}
+                  </section>
+                )}
                 {guardianError && <p className="guardian-error" role="alert">{guardianError}</p>}
+                {familyError && <p className="guardian-error" role="alert">{familyError}</p>}
+                {practiceComplete && !guardianPreview && (
+                  <button className="summary-preview-button" disabled={guardianStatus === "preparing"} onClick={previewForMatt}>{guardianStatus === "preparing" ? "Preparing summary…" : "Preview optional progress summary"}</button>
+                )}
                 {guardianPreview && guardianView && (
                   <section className="guardian-preview" aria-live="polite">
                     <div className="guardian-preview-heading">
