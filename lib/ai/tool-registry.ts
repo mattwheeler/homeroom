@@ -6,6 +6,7 @@ export type ToolStage =
   | "plan_gathering"
   | "plan_save"
   | "source_sync"
+  | "plan_revision"
   | "plan_update"
   | "learning_hint"
   | "learning_complete"
@@ -60,6 +61,12 @@ const schemas = {
   get_morning_plan_context: defineTool(
     "get_morning_plan_context",
     "Read Emily's allowlisted band-camp event, packing list, guardian task, and planning preferences.",
+    stringProperties("sessionId", "studentId"),
+    z.object({ sessionId: id, studentId: id }).strict()
+  ),
+  get_plan_revision_context: defineTool(
+    "get_plan_revision_context",
+    "Read Emily's approved Plan V1 and the application-validated BAND source version change.",
     stringProperties("sessionId", "studentId"),
     z.object({ sessionId: id, studentId: id }).strict()
   ),
@@ -191,6 +198,7 @@ const stageToolNames: Record<ToolStage, readonly ToolName[]> = {
   plan_gathering: ["get_event_details", "read_material", "get_guardian_action", "get_student_plan_preferences"],
   plan_save: ["save_personal_plan"],
   source_sync: ["sync_activity_calendar", "get_source_change"],
+  plan_revision: ["get_plan_revision_context"],
   plan_update: ["update_personal_plan"],
   learning_hint: ["get_practice_exercise"],
   learning_complete: ["record_practice_result"],
@@ -203,7 +211,7 @@ export function getStageTools(stage: ToolStage): FunctionToolDefinition[] {
 }
 
 export function isReadOnlyStage(stage: ToolStage) {
-  return ["orientation", "morning_plan", "plan_gathering", "learning_hint", "guardian_view"].includes(stage);
+  return ["orientation", "morning_plan", "plan_gathering", "plan_revision", "learning_hint", "guardian_view"].includes(stage);
 }
 
 export function validateToolArguments(stage: ToolStage, name: string, args: unknown): unknown {

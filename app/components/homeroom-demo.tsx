@@ -66,6 +66,55 @@ interface SavedPlanResponse {
   };
 }
 
+interface PlanRevisionResponse {
+  revision: {
+    change: {
+      title: string;
+      summary: string;
+      changedField: "checkIn";
+      before: "07:30";
+      after: "07:15";
+      minutesEarlier: 15;
+      sourceLabel: string;
+    };
+    plan: MorningPlan;
+  };
+  approval: {
+    actionId: string;
+    receipt: string;
+    expiresAt: string;
+    planVersion: 2;
+    stateVersion: number;
+  };
+  proof: {
+    model: string;
+    responseIds: string[];
+    tools: string[];
+    sourceVersion: 2;
+    previousPlanVersion: 1;
+  };
+}
+
+interface SavedPlanV2Response {
+  saved: true;
+  planVersion: 2;
+  phase: "PLAN_V2_SAVED";
+  savedAt: string;
+  proof: {
+    approvalId: string;
+    argsHash: string;
+    sourceVersion: 2;
+    stateVersion: number;
+  };
+}
+
+function displayClock(time: string): string {
+  const [hours, minutes] = time.split(":").map(Number);
+  const suffix = (hours ?? 0) >= 12 ? "PM" : "AM";
+  const displayHours = (hours ?? 0) % 12 || 12;
+  return `${displayHours}:${String(minutes ?? 0).padStart(2, "0")} ${suffix}`;
+}
+
 const Icon = ({ name }: { name: "spark" | "calendar" | "book" | "shield" | "arrow" | "clock" }) => {
   const paths = {
     spark: <path d="M12 2.8c.45 4.25 2.95 6.75 7.2 7.2-4.25.45-6.75 2.95-7.2 7.2-.45-4.25-2.95-6.75-7.2-7.2 4.25-.45 6.75-2.95 7.2-7.2Z" />,
@@ -93,6 +142,20 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
   const [approvalStatus, setApprovalStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [approvalError, setApprovalError] = useState("");
   const [savedPlan, setSavedPlan] = useState<SavedPlanResponse | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "ready" | "error">("idle");
+  const [updateError, setUpdateError] = useState("");
+  const [planRevision, setPlanRevision] = useState<PlanRevisionResponse | null>(null);
+  const [v2ApprovalStatus, setV2ApprovalStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [v2ApprovalError, setV2ApprovalError] = useState("");
+  const [savedPlanV2, setSavedPlanV2] = useState<SavedPlanV2Response | null>(null);
+  const displayedBandCamp = planRevision
+    ? {
+        wake: planRevision.revision.plan.steps[0]!.time,
+        departure: planRevision.revision.plan.steps[2]!.time,
+        checkIn: planRevision.revision.plan.steps[3]!.time,
+        start: bandCamp.start
+      }
+    : bandCamp;
 
   async function startDemo() {
     setStatus("starting");
@@ -173,6 +236,59 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
     }
   }
 
+  async function checkBandUpdates() {
+    if (!csrfToken || approvalStatus !== "saved") return;
+    setUpdateStatus("checking");
+    setUpdateError("");
+    try {
+      const response = await fetch("/api/plan-update", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: "{}"
+      });
+      const data = (await response.json()) as PlanRevisionResponse | { error?: { message?: string } };
+      if (!response.ok || !("revision" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to check BAND updates.");
+      }
+      setPlanRevision(data);
+      setUpdateStatus("ready");
+    } catch (caught) {
+      setUpdateError(caught instanceof Error ? caught.message : "Unable to check BAND updates.");
+      setUpdateStatus("error");
+    }
+  }
+
+  async function approvePlanV2() {
+    if (!csrfToken || !planRevision) return;
+    setV2ApprovalStatus("saving");
+    setV2ApprovalError("");
+    try {
+      const response = await fetch("/api/plan-update/approve", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: JSON.stringify({
+          actionId: planRevision.approval.actionId,
+          receipt: planRevision.approval.receipt
+        })
+      });
+      const data = (await response.json()) as SavedPlanV2Response | { error?: { message?: string } };
+      if (!response.ok || !("saved" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to save Plan V2.");
+      }
+      setSavedPlanV2(data);
+      setV2ApprovalStatus("saved");
+    } catch (caught) {
+      setV2ApprovalError(caught instanceof Error ? caught.message : "Unable to save Plan V2.");
+      setV2ApprovalStatus("error");
+    }
+  }
+
   return (
     <main className="app-shell">
       <nav className="topbar" aria-label="Primary navigation">
@@ -231,16 +347,18 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
           ) : (
             <div className="dashboard-grid">
               <section className="band-card card">
-                <div className="card-label"><span className="source-dot" /> FROM BAND CALENDAR</div>
+                <div className="card-label">
+                  <span className="source-dot" /> FROM BAND CALENDAR · SOURCE V{planRevision ? 2 : 1}
+                </div>
                 <div className="band-heading">
                   <div><p>COMING UP IN 16 DAYS</p><h2>First day of band camp</h2></div>
                   <div className="countdown"><strong>16</strong><span>DAYS</span></div>
                 </div>
                 <div className="time-track">
-                  <div><span className="time-dot wake" /><small>WAKE UP</small><strong>{bandCamp.wake} AM</strong></div>
-                  <div><span className="time-dot leave" /><small>LEAVE HOME</small><strong>{bandCamp.departure} AM</strong></div>
-                  <div><span className="time-dot arrive" /><small>CHECK IN</small><strong>{bandCamp.checkIn} AM</strong></div>
-                  <div><span className="time-dot start" /><small>CAMP STARTS</small><strong>{bandCamp.start} AM</strong></div>
+                  <div><span className="time-dot wake" /><small>WAKE UP</small><strong>{displayClock(displayedBandCamp.wake)}</strong></div>
+                  <div><span className="time-dot leave" /><small>LEAVE HOME</small><strong>{displayClock(displayedBandCamp.departure)}</strong></div>
+                  <div><span className="time-dot arrive" /><small>CHECK IN</small><strong>{displayClock(displayedBandCamp.checkIn)}</strong></div>
+                  <div><span className="time-dot start" /><small>CAMP STARTS</small><strong>{displayClock(displayedBandCamp.start)}</strong></div>
                 </div>
                 <button
                   aria-controls="morning-plan-proposal"
@@ -322,6 +440,117 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                         <strong>{morningPlan.proof.responseIds.length} responses verified</strong>
                       </div>
                     </div>
+                  </section>
+                )}
+                {approvalStatus === "saved" && (
+                  <section className="source-update" id="source-update" aria-live="polite">
+                    {!planRevision ? (
+                      <div className="update-check-row">
+                        <div>
+                          <p className="eyebrow">NEXT GOLDEN MOMENT</p>
+                          <strong>Plans should keep up when a school source changes.</strong>
+                          <small>We&apos;ll check the controlled BAND fixture for one new calendar version.</small>
+                        </div>
+                        <button
+                          className="source-check-button"
+                          disabled={updateStatus === "checking"}
+                          onClick={checkBandUpdates}
+                        >
+                          {updateStatus === "checking" ? "Checking the BAND calendar…" : "Check BAND for updates"}
+                          {updateStatus !== "checking" && <Icon name="arrow" />}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="source-version-row">
+                          <span><span className="live-dot" /> BAND calendar update</span>
+                          <span>SOURCE V1 → V2</span>
+                        </div>
+                        <div className="change-heading">
+                          <div>
+                            <p className="eyebrow">ONE SOURCE FACT CHANGED</p>
+                            <h3>{planRevision.revision.change.title}</h3>
+                            <p>{planRevision.revision.change.summary}</p>
+                          </div>
+                          <div className="time-diff" aria-label="Check-in changed from 7:30 AM to 7:15 AM">
+                            <span><small>BEFORE</small><strong>{displayClock(planRevision.revision.change.before)}</strong></span>
+                            <Icon name="arrow" />
+                            <span className="new-time"><small>NOW</small><strong>{displayClock(planRevision.revision.change.after)}</strong></span>
+                          </div>
+                        </div>
+                        <div className="change-evidence">
+                          <Icon name="calendar" />
+                          <span>{planRevision.revision.change.sourceLabel}</span>
+                          <strong>{planRevision.revision.change.minutesEarlier} minutes earlier</strong>
+                        </div>
+
+                        <div className="revision-boundary">
+                          <span>Plan V1 is still active</span>
+                          <span>Nothing changes until Emily approves Plan V2</span>
+                        </div>
+                        <div className="plan-copy revision-copy">
+                          <p className="eyebrow">PROPOSED PLAN V2</p>
+                          <h3>{planRevision.revision.plan.title}</h3>
+                          <p>{planRevision.revision.plan.intro}</p>
+                        </div>
+                        <ol className="plan-steps revision-steps">
+                          {planRevision.revision.plan.steps.map((step) => (
+                            <li key={`v2-${step.time}-${step.title}`}>
+                              <time>{step.time}</time>
+                              <span className="plan-step-marker" />
+                              <div>
+                                <strong>{step.title}</strong>
+                                <p>{step.detail}</p>
+                                <small>{step.sourceLabel}</small>
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                        <div className="plan-guardian-note"><Icon name="shield" /><span>{planRevision.revision.plan.guardianNote}</span></div>
+                        <blockquote>{planRevision.revision.plan.encouragement}</blockquote>
+
+                        <div className="v2-review">
+                          {v2ApprovalStatus === "saved" && savedPlanV2 ? (
+                            <div className="plan-saved" role="status">
+                              <span className="saved-check" aria-hidden="true">✓</span>
+                              <span>
+                                <strong>Plan V2 saved</strong>
+                                <small>Saved by Emily · Source version {savedPlanV2.proof.sourceVersion}</small>
+                              </span>
+                              <span className="saved-version">STATE {savedPlanV2.proof.stateVersion}</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="approval-copy">
+                                <strong>{planRevision.revision.plan.approvalPrompt}</strong>
+                                <small>Plan V1 remains active</small>
+                              </div>
+                              <button
+                                className="approve-button"
+                                disabled={v2ApprovalStatus === "saving"}
+                                onClick={approvePlanV2}
+                              >
+                                {v2ApprovalStatus === "saving" ? "Saving the exact revision…" : "Approve and save Plan V2"}
+                                {v2ApprovalStatus !== "saving" && <Icon name="arrow" />}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                        {v2ApprovalStatus === "error" && <p className="approval-error" role="alert">{v2ApprovalError}</p>}
+                        <div className="approval-proof">
+                          <span>
+                            {v2ApprovalStatus === "saved"
+                              ? "Approval consumed · Plan V1 retained as immutable history"
+                              : `Exact Plan V2 approval expires ${new Date(planRevision.approval.expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
+                          </span>
+                          <div className="proof-token" title={planRevision.proof.model}>
+                            <span>MODEL TRACE</span>
+                            <strong>{planRevision.proof.responseIds.length} responses verified</strong>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {updateStatus === "error" && <p className="approval-error" role="alert">{updateError}</p>}
                   </section>
                 )}
               </section>

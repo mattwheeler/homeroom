@@ -1,5 +1,6 @@
 import type { MorningPlan } from "../ai/morning-plan";
 import type { SessionState } from "../domain/state-machine";
+import type { BandSourceChange } from "../domain/source-sync";
 import type { PendingAction } from "../security/approval";
 import type { D1DatabaseLike, D1RunResult } from "./session-store";
 
@@ -16,9 +17,25 @@ export interface PlanV1ApprovalResult {
   };
 }
 
+export interface PlanV2ApprovalResult {
+  saved: true;
+  planVersion: 2;
+  phase: "PLAN_V2_SAVED";
+  savedAt: string;
+  proof: {
+    approvalId: string;
+    argsHash: string;
+    sourceVersion: 2;
+    stateVersion: number;
+  };
+}
+
+export type PlanApprovalResult = PlanV1ApprovalResult | PlanV2ApprovalResult;
+
 export interface StagedPlanWrite {
   sessionId: string;
   previousStateVersion: number;
+  previousActivePlanVersion: 1 | null;
   nextState: SessionState;
   plan: MorningPlan;
   pending: PendingAction;
@@ -29,12 +46,13 @@ export interface PendingPlanRecord {
   pending: PendingAction;
   plan: MorningPlan;
   consumedAt: string | null;
-  approvalResult: PlanV1ApprovalResult | null;
+  approvalResult: PlanApprovalResult | null;
 }
 
 export interface ApprovedPlanWrite {
   sessionId: string;
   previousStateVersion: number;
+  previousActivePlanVersion: null;
   nextState: SessionState & { phase: "PLAN_V1_SAVED"; sourceVersion: 1; activePlanVersion: 1 };
   plan: MorningPlan;
   pending: PendingAction;
@@ -43,10 +61,40 @@ export interface ApprovedPlanWrite {
   auditEventId: string;
 }
 
+export interface ApprovedPlanV2Write {
+  sessionId: string;
+  previousStateVersion: number;
+  previousActivePlanVersion: 1;
+  nextState: SessionState & { phase: "PLAN_V2_SAVED"; sourceVersion: 2; activePlanVersion: 2 };
+  plan: MorningPlan;
+  pending: PendingAction;
+  approvedBy: string;
+  approvedAt: string;
+  auditEventId: string;
+}
+
+export interface SourceSyncWrite {
+  sessionId: string;
+  previousStateVersion: number;
+  nextState: SessionState & { phase: "SOURCE_V2_SYNCED"; sourceVersion: 2; activePlanVersion: 1 };
+  change: BandSourceChange;
+  syncedAt: string;
+  auditEventId: string;
+}
+
+export interface SourceSyncStore {
+  syncSourceV2(write: SourceSyncWrite): Promise<void>;
+}
+
 export interface PlanApprovalStore {
   stageProposal(write: StagedPlanWrite): Promise<void>;
   findPending(sessionId: string, actionId: string): Promise<PendingPlanRecord | null>;
   approvePlan(write: ApprovedPlanWrite): Promise<PlanV1ApprovalResult>;
+  approvePlanV2(write: ApprovedPlanV2Write): Promise<PlanV2ApprovalResult>;
+}
+
+export interface PlanV2Store extends PlanApprovalStore, SourceSyncStore {
+  findApprovedPlan(sessionId: string, planVersion: 1 | 2): Promise<MorningPlan | null>;
 }
 
 interface PendingPlanRow {
@@ -67,7 +115,11 @@ interface PendingPlanRow {
 
 interface StoredPendingResult {
   plan: MorningPlan;
-  approvalResult?: PlanV1ApprovalResult | null;
+  approvalResult?: PlanApprovalResult | null;
+}
+
+interface ApprovedPlanRow {
+  approved_plan_json: string;
 }
 
 export class PlanStoreError extends Error {
@@ -91,7 +143,7 @@ function requireBatch(database: D1DatabaseLike) {
   return database.batch.bind(database);
 }
 
-export class D1PlanApprovalStore implements PlanApprovalStore {
+export class D1PlanApprovalStore implements PlanV2Store {
   constructor(private readonly database: D1DatabaseLike) {}
 
   async stageProposal(write: StagedPlanWrite): Promise<void> {
@@ -102,7 +154,7 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
         SET state_json = ?, state_version = ?, source_version = ?,
           active_plan_version = ?, updated_at = ?
         WHERE id = ? AND state_version = ? AND source_version = ?
-          AND active_plan_version IS NULL`
+          AND active_plan_version IS ?`
       )
       .bind(
         JSON.stringify(write.nextState),
@@ -112,7 +164,8 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
         write.createdAt,
         write.sessionId,
         write.previousStateVersion,
-        write.nextState.sourceVersion
+        write.nextState.sourceVersion,
+        write.previousActivePlanVersion
       );
     const insertPending = this.database
       .prepare(
@@ -124,7 +177,16 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
         SELECT ?, sessions.id, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?
         FROM demo_sessions AS sessions
         WHERE sessions.id = ? AND sessions.state_version = ?
-          AND sessions.source_version = ?`
+          AND sessions.source_version = ?
+          AND sessions.active_plan_version IS ?
+          AND NOT EXISTS (
+            SELECT 1 FROM pending_actions AS existing
+            WHERE existing.session_id = sessions.id
+              AND existing.expected_state_version = ?
+              AND existing.expected_plan_version = ?
+              AND existing.expected_source_version = ?
+              AND existing.consumed_at IS NULL
+          )`
       )
       .bind(
         write.pending.id,
@@ -139,10 +201,79 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
         JSON.stringify({ plan: write.plan, approvalResult: null }),
         write.sessionId,
         write.nextState.stateVersion,
-        write.nextState.sourceVersion
+        write.nextState.sourceVersion,
+        write.nextState.activePlanVersion,
+        write.pending.expected.stateVersion,
+        write.pending.expected.planVersion,
+        write.pending.expected.sourceVersion
       );
     const results = await batch([updateSession, insertPending]);
     assertBatchResults(results, 2, "Unable to stage the plan proposal.");
+  }
+
+  async syncSourceV2(write: SourceSyncWrite): Promise<void> {
+    const batch = requireBatch(this.database);
+    const updateSession = this.database
+      .prepare(
+        `UPDATE demo_sessions
+        SET state_json = ?, state_version = ?, source_version = 2,
+          active_plan_version = 1, updated_at = ?
+        WHERE id = ? AND state_version = ? AND source_version = 1
+          AND active_plan_version = 1`
+      )
+      .bind(
+        JSON.stringify(write.nextState),
+        write.nextState.stateVersion,
+        write.syncedAt,
+        write.sessionId,
+        write.previousStateVersion
+      );
+    const insertAudit = this.database
+      .prepare(
+        `INSERT INTO audit_events (
+          id, session_id, sequence, actor, event_type, tool_name,
+          source_record_ids_json, state_version, evidence_json, created_at
+        )
+        SELECT ?, sessions.id, COALESCE(MAX(audit.sequence), 0) + 1,
+          ?, ?, ?, ?, ?, ?, ?
+        FROM demo_sessions AS sessions
+        LEFT JOIN audit_events AS audit ON audit.session_id = sessions.id
+        WHERE sessions.id = ? AND sessions.state_version = ?
+          AND sessions.source_version = 2 AND sessions.active_plan_version = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM audit_events AS existing
+            WHERE existing.session_id = sessions.id
+              AND existing.event_type = ? AND existing.state_version = ?
+          )
+        GROUP BY sessions.id`
+      )
+      .bind(
+        write.auditEventId,
+        "system_band_fixture",
+        "SOURCE_V2_SYNCED",
+        "sync_activity_calendar",
+        JSON.stringify([write.change.sourceRecordId]),
+        write.nextState.stateVersion,
+        JSON.stringify(write.change),
+        write.syncedAt,
+        write.sessionId,
+        write.nextState.stateVersion,
+        "SOURCE_V2_SYNCED",
+        write.nextState.stateVersion
+      );
+    const results = await batch([updateSession, insertAudit]);
+    assertBatchResults(results, 2, "Unable to persist the controlled source update.");
+  }
+
+  async findApprovedPlan(sessionId: string, planVersion: 1 | 2): Promise<MorningPlan | null> {
+    const row = await this.database
+      .prepare(
+        `SELECT approved_plan_json FROM plan_versions
+        WHERE session_id = ? AND plan_version = ? LIMIT 1`
+      )
+      .bind(sessionId, planVersion)
+      .first<ApprovedPlanRow>();
+    return row ? JSON.parse(row.approved_plan_json) as MorningPlan : null;
   }
 
   async findPending(sessionId: string, actionId: string): Promise<PendingPlanRecord | null> {
@@ -184,19 +315,45 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
   }
 
   async approvePlan(write: ApprovedPlanWrite): Promise<PlanV1ApprovalResult> {
-    const batch = requireBatch(this.database);
-    const result: PlanV1ApprovalResult = {
-      saved: true,
+    return this.approvePlanVersion(write, {
       planVersion: 1,
-      phase: "PLAN_V1_SAVED",
+      sourceVersion: 1,
+      eventType: "PLAN_V1_APPROVED",
+      expectedAction: "APPROVE_PLAN_V1"
+    }) as Promise<PlanV1ApprovalResult>;
+  }
+
+  async approvePlanV2(write: ApprovedPlanV2Write): Promise<PlanV2ApprovalResult> {
+    return this.approvePlanVersion(write, {
+      planVersion: 2,
+      sourceVersion: 2,
+      eventType: "PLAN_V2_APPROVED",
+      expectedAction: "APPROVE_PLAN_V2"
+    }) as Promise<PlanV2ApprovalResult>;
+  }
+
+  private async approvePlanVersion(
+    write: ApprovedPlanWrite | ApprovedPlanV2Write,
+    config: {
+      planVersion: 1 | 2;
+      sourceVersion: 1 | 2;
+      eventType: "PLAN_V1_APPROVED" | "PLAN_V2_APPROVED";
+      expectedAction: "APPROVE_PLAN_V1" | "APPROVE_PLAN_V2";
+    }
+  ): Promise<PlanApprovalResult> {
+    const batch = requireBatch(this.database);
+    const result = {
+      saved: true,
+      planVersion: config.planVersion,
+      phase: config.planVersion === 1 ? "PLAN_V1_SAVED" : "PLAN_V2_SAVED",
       savedAt: write.approvedAt,
       proof: {
         approvalId: write.pending.id,
         argsHash: write.pending.argsHash,
-        sourceVersion: 1,
+        sourceVersion: config.sourceVersion,
         stateVersion: write.nextState.stateVersion
       }
-    };
+    } as PlanApprovalResult;
     const insertPlan = this.database
       .prepare(
         `INSERT INTO plan_versions (
@@ -211,23 +368,24 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
           AND pending.approval_nonce_hash = ? AND pending.idempotency_key = ?
           AND pending.consumed_at IS NULL
           AND sessions.state_version = ? AND sessions.source_version = ?
-          AND sessions.active_plan_version IS NULL`
+          AND sessions.active_plan_version IS ?`
       )
       .bind(
-        1,
-        1,
+        config.planVersion,
+        config.sourceVersion,
         JSON.stringify(write.plan),
         JSON.stringify(write.plan),
         write.approvedBy,
         write.approvedAt,
         write.pending.id,
         write.sessionId,
-        write.pending.actionType,
+        config.expectedAction,
         write.pending.argsHash,
         write.pending.nonceHash,
         write.pending.idempotencyKey,
         write.previousStateVersion,
-        1
+        config.sourceVersion,
+        write.previousActivePlanVersion
       );
     const consumePending = this.database
       .prepare(
@@ -236,7 +394,7 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
         WHERE id = ? AND session_id = ? AND consumed_at IS NULL
           AND EXISTS (
             SELECT 1 FROM plan_versions
-            WHERE session_id = ? AND plan_version = 1
+            WHERE session_id = ? AND plan_version = ?
               AND approval_args_hash = ?
           )`
       )
@@ -246,6 +404,7 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
         write.pending.id,
         write.sessionId,
         write.sessionId,
+        config.planVersion,
         write.pending.argsHash
       );
     const updateSession = this.database
@@ -253,11 +412,11 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
         `UPDATE demo_sessions
         SET state_json = ?, state_version = ?, source_version = ?,
           active_plan_version = ?, updated_at = ?
-        WHERE id = ? AND state_version = ? AND source_version = 1
-          AND active_plan_version IS NULL
+        WHERE id = ? AND state_version = ? AND source_version = ?
+          AND active_plan_version IS ?
           AND EXISTS (
             SELECT 1 FROM plan_versions
-            WHERE session_id = ? AND plan_version = 1
+            WHERE session_id = ? AND plan_version = ?
               AND approval_args_hash = ?
           )`
       )
@@ -269,7 +428,10 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
         write.approvedAt,
         write.sessionId,
         write.previousStateVersion,
+        config.sourceVersion,
+        write.previousActivePlanVersion,
         write.sessionId,
+        config.planVersion,
         write.pending.argsHash
       );
     const insertAudit = this.database
@@ -285,14 +447,14 @@ export class D1PlanApprovalStore implements PlanApprovalStore {
         write.auditEventId,
         write.sessionId,
         write.approvedBy,
-        "PLAN_V1_APPROVED",
+        config.eventType,
         JSON.stringify(["event_band_camp_day_1", "material_band_packing_v1"]),
         write.nextState.stateVersion,
         JSON.stringify({
           approvalId: write.pending.id,
           argsHash: write.pending.argsHash,
-          planVersion: 1,
-          sourceVersion: 1
+          planVersion: config.planVersion,
+          sourceVersion: config.sourceVersion
         }),
         write.approvedAt,
         write.sessionId

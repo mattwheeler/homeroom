@@ -33,11 +33,15 @@ The AI loop uses low reasoning effort, low verbosity, `store: false`, a four-rou
 
 ## Live Golden Experience slice
 
-The first Golden Experience interaction is live end to end. After Emily starts a signed demo session, **Build my morning plan** calls `gpt-5.6-sol` through the OpenAI Responses API. The model must use one strict, read-only `get_morning_plan_context` function before returning a structured proposal.
+The first two Golden Experience interactions are live end to end. After Emily starts a signed demo session, **Build my morning plan** calls `gpt-5.6-sol` through the OpenAI Responses API. The model must use one strict, read-only `get_morning_plan_context` function before returning a structured proposal.
 
 The server—not the model—enforces the authenticated session, student role, same-origin and CSRF checks, fixture allowlist, source version, exact timeline values, and request limits. Each turn records the returned model name, OpenAI response IDs, tool call ID, latency, and token usage in D1 for the judge proof view. API requests use `store: false` and a hashed safety identifier; the OpenAI key never reaches the browser.
 
 The proposal is staged in D1 with a short-lived approval challenge bound to Emily, the exact server-stored plan, and the expected state, source, and plan versions. The browser sends only the action ID and one-time receipt when Emily selects **Approve and save Plan V1**—it cannot submit replacement plan content. A verified approval atomically writes Plan V1, consumes the receipt, advances the authoritative session state, and adds an audit event. Exact retries within the receipt window return the original saved result without creating a second plan.
+
+After Plan V1 is saved, **Check BAND for updates** advances the controlled calendar fixture from source V1 to V2 and records the sole validated difference: check-in moved from 7:30 AM to 7:15 AM. A second live Responses API turn must use the read-only `get_plan_revision_context` tool before explaining that change and proposing an exact 15-minute shift to the morning timeline. The application keeps Plan V1 active until Emily separately approves Plan V2.
+
+Source sync, model generation, proposal staging, and approval are distinct boundaries. If generation fails after source V2 is committed, a retry resumes from `SOURCE_V2_SYNCED` without repeating the sync. Plan V2 approval is bound to the exact server-stored revision and source V2; the atomic D1 write activates Plan V2 while retaining Plan V1 as immutable history.
 
 ## Local setup
 

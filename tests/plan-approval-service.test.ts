@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { morningPlanSchema, type MorningPlan } from "../lib/ai/morning-plan";
 import {
+  approvePlanV2,
   approvePlanV1,
+  stagePlanV2Proposal,
   stagePlanV1Proposal
 } from "../lib/domain/plan-approval";
 import type {
+  ApprovedPlanV2Write,
   ApprovedPlanWrite,
   PendingPlanRecord,
   PlanApprovalStore,
@@ -27,6 +30,19 @@ const plan: MorningPlan = morningPlanSchema.parse({
   approvalPrompt: "Review this proposal. Would you like to save it?"
 });
 
+const planV2: MorningPlan = morningPlanSchema.parse({
+  ...plan,
+  title: "Updated band-camp morning",
+  intro: "The same calm routine, shifted 15 minutes earlier.",
+  steps: [
+    { time: "06:15", title: "Wake up", detail: "Get dressed and have breakfast.", sourceLabel: "Homeroom plan" },
+    { time: "06:30", title: "Final bag check", detail: "Bring your instrument, water, and music folder.", sourceLabel: "Band packing list" },
+    { time: "06:45", title: "Leave home", detail: "Allow 20 minutes for travel and a 10-minute buffer.", sourceLabel: "BAND calendar + preferences" },
+    { time: "07:15", title: "Check in", detail: "You will be ready before the 8:00 AM start.", sourceLabel: "BAND calendar" }
+  ],
+  approvalPrompt: "Review the updated times before saving Plan V2."
+});
+
 function orientationSession(): SessionRecord {
   return {
     id: "session_01",
@@ -44,6 +60,7 @@ function orientationSession(): SessionRecord {
 class MemoryPlanApprovalStore implements PlanApprovalStore {
   staged: StagedPlanWrite | null = null;
   approved: ApprovedPlanWrite[] = [];
+  approvedV2: ApprovedPlanV2Write[] = [];
   pending: PendingPlanRecord | null = null;
 
   async stageProposal(write: StagedPlanWrite) {
@@ -67,6 +84,29 @@ class MemoryPlanApprovalStore implements PlanApprovalStore {
         approvalId: write.pending.id,
         argsHash: write.pending.argsHash,
         sourceVersion: write.nextState.sourceVersion,
+        stateVersion: write.nextState.stateVersion
+      }
+    };
+    this.pending = {
+      pending: write.pending,
+      plan: write.plan,
+      consumedAt: write.approvedAt,
+      approvalResult: result
+    };
+    return result;
+  }
+
+  async approvePlanV2(write: ApprovedPlanV2Write) {
+    this.approvedV2.push(write);
+    const result = {
+      saved: true as const,
+      planVersion: 2 as const,
+      phase: write.nextState.phase,
+      savedAt: write.approvedAt,
+      proof: {
+        approvalId: write.pending.id,
+        argsHash: write.pending.argsHash,
+        sourceVersion: 2 as const,
         stateVersion: write.nextState.stateVersion
       }
     };
@@ -201,5 +241,79 @@ describe("Plan V1 exact-content approval", () => {
 
     expect(replay).toEqual(first);
     expect(store.approved).toHaveLength(1);
+  });
+});
+
+describe("Plan V2 exact-content approval", () => {
+  it("keeps Plan V1 active while staging a source-version-two proposal", async () => {
+    const store = new MemoryPlanApprovalStore();
+    const session = orientationSession();
+    session.state = { phase: "SOURCE_V2_SYNCED", stateVersion: 8, sourceVersion: 2, activePlanVersion: 1 };
+    const result = await stagePlanV2Proposal({
+      session,
+      plan: planV2,
+      store,
+      now: () => new Date("2026-07-18T12:08:00.000Z"),
+      nonce: "fixed-v2-approval-receipt"
+    });
+
+    expect(store.staged).toMatchObject({
+      sessionId: "session_01",
+      previousStateVersion: 8,
+      previousActivePlanVersion: 1,
+      nextState: {
+        phase: "PLAN_V2_PROPOSED", stateVersion: 9, sourceVersion: 2, activePlanVersion: 1
+      },
+      plan: planV2
+    });
+    expect(store.staged?.pending).toMatchObject({
+      actionType: "APPROVE_PLAN_V2",
+      expected: { stateVersion: 9, sourceVersion: 2, planVersion: 2 }
+    });
+    expect(result.approval).toMatchObject({
+      receipt: "fixed-v2-approval-receipt",
+      planVersion: 2,
+      stateVersion: 9
+    });
+  });
+
+  it("activates exact Plan V2 and returns the original result on retry", async () => {
+    const store = new MemoryPlanApprovalStore();
+    const session = orientationSession();
+    session.state = { phase: "SOURCE_V2_SYNCED", stateVersion: 8, sourceVersion: 2, activePlanVersion: 1 };
+    const staged = await stagePlanV2Proposal({
+      session,
+      plan: planV2,
+      store,
+      now: () => new Date("2026-07-18T12:08:00.000Z"),
+      nonce: "fixed-v2-approval-receipt"
+    });
+    session.state = store.staged!.nextState;
+    const approvalInput = {
+      session,
+      actionId: staged.approval.actionId,
+      receipt: staged.approval.receipt,
+      store,
+      now: () => new Date("2026-07-18T12:09:00.000Z")
+    };
+
+    const result = await approvePlanV2(approvalInput);
+    expect(result).toMatchObject({
+      saved: true,
+      planVersion: 2,
+      phase: "PLAN_V2_SAVED",
+      proof: { sourceVersion: 2, stateVersion: 10 }
+    });
+    expect(store.approvedV2).toEqual([
+      expect.objectContaining({
+        plan: planV2,
+        previousActivePlanVersion: 1,
+        nextState: expect.objectContaining({ phase: "PLAN_V2_SAVED", activePlanVersion: 2, sourceVersion: 2 })
+      })
+    ]);
+
+    session.state = { phase: "PLAN_V2_SAVED", stateVersion: 10, sourceVersion: 2, activePlanVersion: 2 };
+    await expect(approvePlanV2(approvalInput)).resolves.toEqual(result);
+    expect(store.approvedV2).toHaveLength(1);
   });
 });

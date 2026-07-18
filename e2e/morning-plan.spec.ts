@@ -14,7 +14,29 @@ const plan = {
   approvalPrompt: "Review this proposal. Would you like to adjust anything before saving it?"
 };
 
-test("Emily builds and explicitly saves a source-grounded Plan V1", async ({ page }) => {
+const revision = {
+  change: {
+    title: "Your BAND check-in moved 15 minutes earlier",
+    summary: "Check-in changed from 7:30 AM to 7:15 AM, so the morning steps move 15 minutes earlier.",
+    changedField: "checkIn",
+    before: "07:30",
+    after: "07:15",
+    minutesEarlier: 15,
+    sourceLabel: "BAND calendar · event_band_camp_day_1"
+  },
+  plan: {
+    ...plan,
+    title: "Updated band-camp morning",
+    intro: "The same calm routine, shifted 15 minutes earlier.",
+    steps: plan.steps.map((step, index) => ({
+      ...step,
+      time: ["06:15", "06:30", "06:45", "07:15"][index]
+    })),
+    approvalPrompt: "Review the updated times before saving Plan V2."
+  }
+};
+
+test("Emily saves Plan V1, reviews a BAND source change, and explicitly saves Plan V2", async ({ page }) => {
   await page.route("**/api/demo-sessions", async (route) => {
     await route.fulfill({
       status: 201,
@@ -73,6 +95,53 @@ test("Emily builds and explicitly saves a source-grounded Plan V1", async ({ pag
       })
     });
   });
+  await page.route("**/api/plan-update", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    expect(route.request().postDataJSON()).toEqual({});
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        revision,
+        approval: {
+          actionId: "action_222222222222222222222222",
+          receipt: "receipt-v2-value-long-enough",
+          expiresAt: "2026-07-18T12:13:00.000Z",
+          planVersion: 2,
+          stateVersion: 9
+        },
+        proof: {
+          model: "gpt-5.6-sol-2026-07-15",
+          responseIds: ["resp_revision_context", "resp_revision"],
+          tools: ["get_plan_revision_context"],
+          sourceVersion: 2,
+          previousPlanVersion: 1
+        }
+      })
+    });
+  });
+  await page.route("**/api/plan-update/approve", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      actionId: "action_222222222222222222222222",
+      receipt: "receipt-v2-value-long-enough"
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        saved: true,
+        planVersion: 2,
+        phase: "PLAN_V2_SAVED",
+        savedAt: "2026-07-18T12:09:00.000Z",
+        proof: {
+          approvalId: "action_222222222222222222222222",
+          argsHash: "b".repeat(64),
+          sourceVersion: 2,
+          stateVersion: 10
+        }
+      })
+    });
+  });
 
   await page.goto("/");
   await page.getByRole("button", { name: "Start my day" }).click();
@@ -87,4 +156,14 @@ test("Emily builds and explicitly saves a source-grounded Plan V1", async ({ pag
   await page.getByRole("button", { name: "Approve and save Plan V1" }).click();
   await expect(page.getByText("Plan V1 saved")).toBeVisible();
   await expect(page.getByText("Saved by Emily · Source version 1")).toBeVisible();
+  await page.getByRole("button", { name: "Check BAND for updates" }).click();
+  await expect(page.getByRole("heading", { name: revision.change.title })).toBeVisible();
+  await expect(page.locator(".time-diff").getByText("7:30 AM", { exact: true })).toBeVisible();
+  await expect(page.locator(".time-diff").getByText("7:15 AM", { exact: true })).toBeVisible();
+  await expect(page.getByText("FROM BAND CALENDAR · SOURCE V2", { exact: true })).toBeVisible();
+  await expect(page.locator(".time-track").getByText("7:15 AM", { exact: true })).toBeVisible();
+  await expect(page.getByText("Plan V1 is still active", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Approve and save Plan V2" }).click();
+  await expect(page.getByText("Plan V2 saved", { exact: true })).toBeVisible();
+  await expect(page.getByText("Saved by Emily · Source version 2", { exact: true })).toBeVisible();
 });

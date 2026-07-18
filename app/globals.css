@@ -192,6 +192,37 @@ a { color: inherit; text-decoration: none; }
 .proof-token span { color: #8a9890; font-size: .48rem; font-weight: 800; letter-spacing: .13em; }
 .proof-token strong { margin-top: 3px; color: #466456; font-size: .58rem; }
 
+.source-update { position: relative; z-index: 2; margin: 18px -8px -4px; padding: 22px 25px; border: 1px solid rgba(255,255,255,.18); border-radius: 18px; color: var(--ink); background: linear-gradient(145deg, #fffdf8, #f2f6ef); box-shadow: 0 18px 45px rgba(12,35,28,.18); animation: reveal .42s ease both; }
+.update-check-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.update-check-row > div { display: flex; flex-direction: column; }
+.update-check-row .eyebrow { margin-bottom: 6px; }
+.update-check-row strong { font-family: Georgia, serif; font-size: 1.08rem; font-weight: 500; }
+.update-check-row small { margin-top: 5px; color: var(--muted); font-size: .61rem; }
+.source-check-button { flex: none; display: flex; align-items: center; gap: 8px; padding: 11px 14px 11px 16px; border: 1px solid #d6b272; border-radius: 11px; color: #745323; background: #fff8e9; font-size: .67rem; font-weight: 760; cursor: pointer; }
+.source-check-button .icon { width: 14px; }
+.source-check-button:disabled { opacity: .7; cursor: wait; }
+.source-version-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.source-version-row > span { display: flex; align-items: center; padding: 6px 9px; border: 1px solid #d9e5dc; border-radius: 999px; color: #547163; background: white; font-size: .53rem; font-weight: 800; letter-spacing: .06em; }
+.source-version-row .live-dot { flex: none; }
+.change-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 25px; }
+.change-heading h3 { margin: 0; font-family: Georgia, serif; font-size: 1.65rem; font-weight: 500; letter-spacing: -.035em; }
+.change-heading > div:first-child > p:last-child { max-width: 610px; margin: 8px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.5; }
+.time-diff { flex: none; display: flex; align-items: center; gap: 9px; }
+.time-diff > span { display: flex; flex-direction: column; min-width: 72px; padding: 9px 10px; border: 1px solid #e1e6e1; border-radius: 10px; color: #748179; background: white; }
+.time-diff small { font-size: .46rem; font-weight: 820; letter-spacing: .12em; }
+.time-diff strong { margin-top: 3px; font-family: Georgia, serif; font-size: .82rem; }
+.time-diff .icon { width: 14px; color: #9aa69e; }
+.time-diff .new-time { border-color: #e7bd79; color: #765022; background: #fff6e6; }
+.change-evidence { display: flex; align-items: center; gap: 7px; margin-top: 15px; padding: 9px 11px; border-radius: 9px; color: #5e7468; background: #eaf1e9; font-size: .57rem; }
+.change-evidence .icon { width: 14px; }
+.change-evidence strong { margin-left: auto; color: #8a5b2a; }
+.revision-boundary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 19px 0; padding: 10px 12px; border: 1px dashed #d8b36f; border-radius: 9px; color: #7d5927; background: #fffaf0; font-size: .58rem; font-weight: 750; }
+.revision-boundary span:last-child { color: #927c5e; font-weight: 600; }
+.revision-copy { padding-top: 2px; }
+.revision-steps { margin-bottom: 19px; }
+.source-update blockquote { margin: 17px 0; padding-left: 13px; border-left: 2px solid #e3a85d; color: #52685c; font-family: Georgia, serif; font-size: .82rem; line-height: 1.45; }
+.v2-review { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 17px; border-top: 1px solid var(--line); }
+
 .prep-card, .classes-card { padding: 25px; }
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; }
 .section-heading h2 { margin: 0; font-family: Georgia, serif; font-size: 1.35rem; font-weight: 500; letter-spacing: -.025em; }
@@ -254,6 +285,10 @@ a { color: inherit; text-decoration: none; }
   .plan-steps { grid-template-columns: 1fr; }
   .plan-steps li::after { display: none; }
   .plan-review { align-items: flex-start; flex-direction: column; }
+  .update-check-row, .change-heading, .v2-review { align-items: stretch; flex-direction: column; }
+  .source-check-button { width: 100%; justify-content: center; }
+  .time-diff { justify-content: flex-start; }
+  .revision-boundary { align-items: flex-start; flex-direction: column; }
   .approve-button { width: 100%; justify-content: center; }
   .approval-proof { align-items: flex-start; flex-direction: column; }
   .plan-saved { grid-template-columns: auto 1fr; }
