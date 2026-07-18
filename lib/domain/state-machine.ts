@@ -43,23 +43,23 @@ export type SessionAction =
   | { type: "PUBLISH_GUARDIAN"; approvalVerified?: boolean }
   | { type: "OPEN_PROOF" };
 
-const transitionMap: Record<SessionPhase, SessionAction["type"] | null> = {
-  FRESH: "SAVE_PROFILE",
-  PROFILE_SAVED: "SAVE_CONNECTIONS",
-  CONNECTIONS_SAVED: "SAVE_PRIVACY_POLICY",
-  POLICY_SAVED: "LOAD_ORIENTATION",
-  ORIENTATION_READY: "PROPOSE_PLAN",
-  PLAN_PROPOSED: "EDIT_PLAN",
-  PLAN_EDITED: "APPROVE_PLAN_V1",
-  PLAN_V1_SAVED: "SYNC_SOURCE_V2",
-  SOURCE_V2_SYNCED: "PROPOSE_PLAN_V2",
-  PLAN_V2_PROPOSED: "APPROVE_PLAN_V2",
-  PLAN_V2_SAVED: "REQUEST_HINT",
-  HINT_USED: "COMPLETE_PRACTICE",
-  PRACTICE_COMPLETE: "PREVIEW_GUARDIAN",
-  GUARDIAN_PREVIEWED: "PUBLISH_GUARDIAN",
-  GUARDIAN_PUBLISHED: "OPEN_PROOF",
-  COMPLETE: null
+const transitionMap: Record<SessionPhase, readonly SessionAction["type"][]> = {
+  FRESH: ["SAVE_PROFILE"],
+  PROFILE_SAVED: ["SAVE_CONNECTIONS"],
+  CONNECTIONS_SAVED: ["SAVE_PRIVACY_POLICY"],
+  POLICY_SAVED: ["LOAD_ORIENTATION"],
+  ORIENTATION_READY: ["PROPOSE_PLAN"],
+  PLAN_PROPOSED: ["EDIT_PLAN", "APPROVE_PLAN_V1"],
+  PLAN_EDITED: ["APPROVE_PLAN_V1"],
+  PLAN_V1_SAVED: ["SYNC_SOURCE_V2"],
+  SOURCE_V2_SYNCED: ["PROPOSE_PLAN_V2"],
+  PLAN_V2_PROPOSED: ["APPROVE_PLAN_V2"],
+  PLAN_V2_SAVED: ["REQUEST_HINT"],
+  HINT_USED: ["COMPLETE_PRACTICE"],
+  PRACTICE_COMPLETE: ["PREVIEW_GUARDIAN"],
+  GUARDIAN_PREVIEWED: ["PUBLISH_GUARDIAN"],
+  GUARDIAN_PUBLISHED: ["OPEN_PROOF"],
+  COMPLETE: []
 };
 
 const nextPhase: Record<SessionAction["type"], SessionPhase> = {
@@ -93,11 +93,23 @@ export function createInitialSessionState(): SessionState {
   return { phase: "FRESH", stateVersion: 1, sourceVersion: 1, activePlanVersion: null };
 }
 
+export function createGoldenDemoSessionState(): SessionState {
+  let state = createInitialSessionState();
+  for (const type of [
+    "SAVE_PROFILE",
+    "SAVE_CONNECTIONS",
+    "SAVE_PRIVACY_POLICY",
+    "LOAD_ORIENTATION"
+  ] as const) state = transitionSession(state, { type });
+  return state;
+}
+
 export function transitionSession(state: SessionState, action: SessionAction): SessionState {
   const allowed = transitionMap[state.phase];
-  if (allowed !== action.type) {
+  if (!allowed.includes(action.type)) {
     throw new StateTransitionError(
-      "Action " + action.type + " is not allowed from " + state.phase + ". Expected " + (allowed ?? "none") + "."
+      "Action " + action.type + " is not allowed from " + state.phase + ". Expected " +
+        (allowed.length > 0 ? allowed.join(" or ") : "none") + "."
     );
   }
   if (

@@ -14,7 +14,7 @@ const plan = {
   approvalPrompt: "Review this proposal. Would you like to adjust anything before saving it?"
 };
 
-test("Emily builds a live, source-grounded morning-plan proposal", async ({ page }) => {
+test("Emily builds and explicitly saves a source-grounded Plan V1", async ({ page }) => {
   await page.route("**/api/demo-sessions", async (route) => {
     await route.fulfill({
       status: 201,
@@ -34,11 +34,41 @@ test("Emily builds a live, source-grounded morning-plan proposal", async ({ page
       contentType: "application/json",
       body: JSON.stringify({
         plan,
+        approval: {
+          actionId: "action_123456789012345678901234",
+          receipt: "receipt-value-long-enough",
+          expiresAt: "2026-07-18T12:10:00.000Z",
+          planVersion: 1,
+          stateVersion: 6
+        },
         proof: {
           model: "gpt-5.6-sol-2026-07-15",
           responseIds: ["resp_context", "resp_plan"],
           tools: ["get_morning_plan_context"],
           sourceVersion: 1
+        }
+      })
+    });
+  });
+  await page.route("**/api/morning-plan/approve", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    expect(route.request().postDataJSON()).toEqual({
+      actionId: "action_123456789012345678901234",
+      receipt: "receipt-value-long-enough"
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        saved: true,
+        planVersion: 1,
+        phase: "PLAN_V1_SAVED",
+        savedAt: "2026-07-18T12:06:00.000Z",
+        proof: {
+          approvalId: "action_123456789012345678901234",
+          argsHash: "a".repeat(64),
+          sourceVersion: 1,
+          stateVersion: 7
         }
       })
     });
@@ -54,4 +84,7 @@ test("Emily builds a live, source-grounded morning-plan proposal", async ({ page
   await expect(page.getByText(plan.guardianNote)).toBeVisible();
   await expect(page.getByText("Live GPT-5.6 Sol")).toBeVisible();
   await expect(page.getByText("Nothing has been saved yet")).toBeVisible();
+  await page.getByRole("button", { name: "Approve and save Plan V1" }).click();
+  await expect(page.getByText("Plan V1 saved")).toBeVisible();
+  await expect(page.getByText("Saved by Emily · Source version 1")).toBeVisible();
 });

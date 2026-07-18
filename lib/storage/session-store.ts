@@ -20,6 +20,7 @@ export interface SessionStore {
 
 export interface D1RunResult {
   success: boolean;
+  meta?: { changes?: number };
 }
 
 export interface D1BoundStatementLike {
@@ -33,6 +34,7 @@ export interface D1PreparedStatementLike {
 
 export interface D1DatabaseLike {
   prepare(sql: string): D1PreparedStatementLike;
+  batch?(statements: D1BoundStatementLike[]): Promise<D1RunResult[]>;
 }
 
 interface SessionRow {

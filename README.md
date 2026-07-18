@@ -31,11 +31,13 @@ All names and school records in the repository are fictional fixtures. No real s
 
 The AI loop uses low reasoning effort, low verbosity, `store: false`, a four-round tool ceiling, and preserves complete response output items and tool call IDs across continuations. The model can propose and explain; the application remains authoritative for permissions, state transitions, source diffs, math grading, and writes.
 
-## Live OpenAI slice
+## Live Golden Experience slice
 
 The first Golden Experience interaction is live end to end. After Emily starts a signed demo session, **Build my morning plan** calls `gpt-5.6-sol` through the OpenAI Responses API. The model must use one strict, read-only `get_morning_plan_context` function before returning a structured proposal.
 
-The server—not the model—enforces the authenticated session, student role, same-origin and CSRF checks, fixture allowlist, source version, exact timeline values, four-request-per-minute limit, and the boundary that nothing is saved without Emily's later approval. Each turn records the returned model name, OpenAI response IDs, tool call ID, latency, and token usage in D1 for the judge proof view. API requests use `store: false` and a hashed safety identifier; the OpenAI key never reaches the browser.
+The server—not the model—enforces the authenticated session, student role, same-origin and CSRF checks, fixture allowlist, source version, exact timeline values, and request limits. Each turn records the returned model name, OpenAI response IDs, tool call ID, latency, and token usage in D1 for the judge proof view. API requests use `store: false` and a hashed safety identifier; the OpenAI key never reaches the browser.
+
+The proposal is staged in D1 with a short-lived approval challenge bound to Emily, the exact server-stored plan, and the expected state, source, and plan versions. The browser sends only the action ID and one-time receipt when Emily selects **Approve and save Plan V1**—it cannot submit replacement plan content. A verified approval atomically writes Plan V1, consumes the receipt, advances the authoritative session state, and adds an audit event. Exact retries within the receipt window return the original saved result without creating a second plan.
 
 ## Local setup
 

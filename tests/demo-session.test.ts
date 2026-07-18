@@ -40,7 +40,7 @@ describe("secure demo session creation", () => {
 
     expect(result).toMatchObject({
       sessionId: "session_01",
-      phase: "FRESH",
+      phase: "ORIENTATION_READY",
       profile: { name: "Emily", grade: 9 },
       expiresAt: "2026-07-18T14:00:00.000Z"
     });
@@ -50,7 +50,11 @@ describe("secure demo session creation", () => {
     });
 
     const persisted = await store.findById("session_01");
-    expect(persisted?.state).toMatchObject({ stateVersion: 1, sourceVersion: 1 });
+    expect(persisted?.state).toMatchObject({
+      phase: "ORIENTATION_READY",
+      stateVersion: 5,
+      sourceVersion: 1
+    });
     expect(persisted?.csrfHash).toBe(createHash("sha256").update(result.csrfToken).digest("hex"));
     expect(persisted?.csrfHash).not.toContain(result.csrfToken);
   });

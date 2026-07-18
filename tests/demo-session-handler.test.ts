@@ -50,7 +50,7 @@ describe("demo-session HTTP handler", () => {
     expect(body).toMatchObject({
       sessionId: "session_01",
       csrfToken: expect.any(String),
-      phase: "FRESH",
+      phase: "ORIENTATION_READY",
       profile: { name: "Emily", grade: 9 }
     });
     expect(body).not.toHaveProperty("sessionToken");

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { HOMEROOM_SEED_KEY, emilyFixture, mattFixture } from "./fixtures";
-import { createInitialSessionState } from "./state-machine";
+import { createGoldenDemoSessionState } from "./state-machine";
 import { signSessionToken, type SessionRole } from "../security/session-token";
 import type { SessionRecord, SessionStore } from "../storage/session-store";
 
@@ -44,7 +44,9 @@ export async function createDemoSession(input: unknown, dependencies: DemoSessio
   const csrfToken = base64Url(dependencies.randomBytes?.() ?? randomCsrfBytes());
   const expiresAtMs = now.getTime() + 2 * 60 * 60 * 1000;
   const expiresAt = new Date(expiresAtMs).toISOString();
-  const state = createInitialSessionState();
+  // Guardian setup is part of the fixture contract, so the judged student demo
+  // begins at the first student-controlled action rather than replaying setup.
+  const state = createGoldenDemoSessionState();
   const record: SessionRecord = {
     id: sessionId,
     fixtureKey: request.fixtureKey,

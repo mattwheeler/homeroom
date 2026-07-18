@@ -2,9 +2,11 @@ import { env } from "cloudflare:workers";
 
 import { generateMorningPlan } from "../../../lib/ai/morning-plan";
 import { createOpenAIResponsesClient } from "../../../lib/ai/openai-client";
+import { stagePlanV1Proposal } from "../../../lib/domain/plan-approval";
 import { handleGenerateMorningPlan } from "../../../lib/http/morning-plan-handler";
 import { FixedWindowRateLimiter } from "../../../lib/security/rate-limit";
 import { D1AiTurnStore } from "../../../lib/storage/ai-turn-store";
+import { D1PlanApprovalStore } from "../../../lib/storage/plan-store";
 import { D1SessionStore } from "../../../lib/storage/session-store";
 
 const limiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 60_000 });
@@ -18,12 +20,17 @@ export async function POST(request: Request) {
   }
   const sessionStore = new D1SessionStore(env.HOMEROOM_DB);
   const traceStore = new D1AiTurnStore(env.HOMEROOM_DB);
+  const planStore = new D1PlanApprovalStore(env.HOMEROOM_DB);
   const client = createOpenAIResponsesClient(env.OPENAI_API_KEY);
   return handleGenerateMorningPlan(request, {
     store: sessionStore,
     signingSecret: env.SESSION_SIGNING_SECRET,
     rateLimiter: limiter,
     clientKey: request.headers.get("cf-connecting-ip") ?? "local-preview",
-    generate: (session) => generateMorningPlan({ session, client, traceStore })
+    generate: async (session) => {
+      const generated = await generateMorningPlan({ session, client, traceStore });
+      const staged = await stagePlanV1Proposal({ session, plan: generated.plan, store: planStore });
+      return { ...generated, ...staged };
+    }
   });
 }

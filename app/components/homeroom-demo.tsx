@@ -38,11 +38,31 @@ interface MorningPlan {
 
 interface MorningPlanResponse {
   plan: MorningPlan;
+  approval: {
+    actionId: string;
+    receipt: string;
+    expiresAt: string;
+    planVersion: 1;
+    stateVersion: number;
+  };
   proof: {
     model: string;
     responseIds: string[];
     tools: string[];
     sourceVersion: number;
+  };
+}
+
+interface SavedPlanResponse {
+  saved: true;
+  planVersion: 1;
+  phase: "PLAN_V1_SAVED";
+  savedAt: string;
+  proof: {
+    approvalId: string;
+    argsHash: string;
+    sourceVersion: 1;
+    stateVersion: number;
   };
 }
 
@@ -70,6 +90,9 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
   const [planStatus, setPlanStatus] = useState<"idle" | "building" | "ready" | "error">("idle");
   const [planError, setPlanError] = useState("");
   const [morningPlan, setMorningPlan] = useState<MorningPlanResponse | null>(null);
+  const [approvalStatus, setApprovalStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [approvalError, setApprovalError] = useState("");
+  const [savedPlan, setSavedPlan] = useState<SavedPlanResponse | null>(null);
 
   async function startDemo() {
     setStatus("starting");
@@ -98,6 +121,9 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
     }
     setPlanStatus("building");
     setPlanError("");
+    setApprovalStatus("idle");
+    setApprovalError("");
+    setSavedPlan(null);
     try {
       const response = await fetch("/api/morning-plan", {
         method: "POST",
@@ -116,6 +142,34 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
     } catch (caught) {
       setPlanError(caught instanceof Error ? caught.message : "Unable to build your morning plan.");
       setPlanStatus("error");
+    }
+  }
+
+  async function approveMorningPlan() {
+    if (!csrfToken || !morningPlan) return;
+    setApprovalStatus("saving");
+    setApprovalError("");
+    try {
+      const response = await fetch("/api/morning-plan/approve", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: JSON.stringify({
+          actionId: morningPlan.approval.actionId,
+          receipt: morningPlan.approval.receipt
+        })
+      });
+      const data = (await response.json()) as SavedPlanResponse | { error?: { message?: string } };
+      if (!response.ok || !("saved" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to save your plan.");
+      }
+      setSavedPlan(data);
+      setApprovalStatus("saved");
+    } catch (caught) {
+      setApprovalError(caught instanceof Error ? caught.message : "Unable to save your plan.");
+      setApprovalStatus("error");
     }
   }
 
@@ -191,15 +245,15 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                 <button
                   aria-controls="morning-plan-proposal"
                   className="text-button plan-trigger"
-                  disabled={planStatus === "building"}
+                  disabled={planStatus === "building" || morningPlan !== null}
                   onClick={buildMorningPlan}
                 >
                   {planStatus === "building"
                     ? "Building from your approved sources…"
                     : morningPlan
-                      ? "Build it again"
+                      ? "Proposal ready for review"
                       : "Build my morning plan"}
-                  {planStatus !== "building" && <Icon name="arrow" />}
+                  {planStatus !== "building" && !morningPlan && <Icon name="arrow" />}
                 </button>
                 {planStatus === "error" && <p className="plan-error" role="alert">{planError}</p>}
                 {morningPlan && (
@@ -230,10 +284,39 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                     <div className="plan-guardian-note"><Icon name="shield" /><span>{morningPlan.plan.guardianNote}</span></div>
                     <blockquote>{morningPlan.plan.encouragement}</blockquote>
                     <div className="plan-review">
-                      <div>
-                        <strong>{morningPlan.plan.approvalPrompt}</strong>
-                        <small>Nothing has been saved yet</small>
-                      </div>
+                      {approvalStatus === "saved" && savedPlan ? (
+                        <div className="plan-saved" role="status">
+                          <span className="saved-check" aria-hidden="true">✓</span>
+                          <span>
+                            <strong>Plan V1 saved</strong>
+                            <small>Saved by Emily · Source version {savedPlan.proof.sourceVersion}</small>
+                          </span>
+                          <span className="saved-version">STATE {savedPlan.proof.stateVersion}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="approval-copy">
+                            <strong>{morningPlan.plan.approvalPrompt}</strong>
+                            <small>Nothing has been saved yet</small>
+                          </div>
+                          <button
+                            className="approve-button"
+                            disabled={approvalStatus === "saving"}
+                            onClick={approveMorningPlan}
+                          >
+                            {approvalStatus === "saving" ? "Saving the exact plan…" : "Approve and save Plan V1"}
+                            {approvalStatus !== "saving" && <Icon name="arrow" />}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {approvalStatus === "error" && <p className="approval-error" role="alert">{approvalError}</p>}
+                    <div className="approval-proof">
+                      <span>
+                        {approvalStatus === "saved"
+                          ? "Approval consumed · exact approved content recorded"
+                          : `Approval is bound to this exact plan · expires ${new Date(morningPlan.approval.expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
+                      </span>
                       <div className="proof-token" title={morningPlan.proof.model}>
                         <span>MODEL TRACE</span>
                         <strong>{morningPlan.proof.responseIds.length} responses verified</strong>

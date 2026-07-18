@@ -30,14 +30,29 @@ describe("golden-path state machine", () => {
       "SAVE_CONNECTIONS",
       "SAVE_PRIVACY_POLICY",
       "LOAD_ORIENTATION",
-      "PROPOSE_PLAN",
-      "EDIT_PLAN"
+      "PROPOSE_PLAN"
     ] as const) {
       state = transitionSession(state, { type });
     }
     expect(() => transitionSession(state, { type: "APPROVE_PLAN_V1" })).toThrowError(
       /approval/i
     );
+    expect(
+      transitionSession(state, { type: "APPROVE_PLAN_V1", approvalVerified: true })
+    ).toMatchObject({ phase: "PLAN_V1_SAVED", activePlanVersion: 1 });
+  });
+
+  it("supports optional edits without requiring an edit to approve an unchanged proposal", () => {
+    let state = createInitialSessionState();
+    for (const type of [
+      "SAVE_PROFILE",
+      "SAVE_CONNECTIONS",
+      "SAVE_PRIVACY_POLICY",
+      "LOAD_ORIENTATION",
+      "PROPOSE_PLAN",
+      "EDIT_PLAN"
+    ] as const) state = transitionSession(state, { type });
+
     expect(
       transitionSession(state, { type: "APPROVE_PLAN_V1", approvalVerified: true })
     ).toMatchObject({ phase: "PLAN_V1_SAVED", activePlanVersion: 1 });

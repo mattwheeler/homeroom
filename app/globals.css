@@ -174,9 +174,20 @@ a { color: inherit; text-decoration: none; }
 .plan-guardian-note .icon { width: 15px; flex: none; }
 .morning-plan blockquote { margin: 17px 0; padding-left: 13px; border-left: 2px solid #e3a85d; color: #52685c; font-family: Georgia, serif; font-size: .82rem; line-height: 1.45; }
 .plan-review { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 17px; border-top: 1px solid var(--line); }
-.plan-review > div:first-child { display: flex; flex-direction: column; }
-.plan-review > div:first-child strong { max-width: 520px; font-size: .7rem; line-height: 1.4; }
-.plan-review > div:first-child small { margin-top: 4px; color: #a1684a; font-size: .55rem; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
+.approval-copy { display: flex; flex-direction: column; }
+.approval-copy strong { max-width: 500px; font-size: .7rem; line-height: 1.4; }
+.approval-copy small { margin-top: 4px; color: #a1684a; font-size: .55rem; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
+.approve-button { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 13px 10px 15px; border: 0; border-radius: 10px; color: white; background: var(--green); font-size: .65rem; font-weight: 760; cursor: pointer; box-shadow: 0 7px 16px rgba(36,79,67,.18); }
+.approve-button .icon { width: 14px; }
+.approve-button:disabled { opacity: .7; cursor: wait; }
+.approval-error { margin: 10px 0 0; color: #a13b2d; font-size: .62rem; }
+.plan-saved { width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid #c9dfd0; border-radius: 11px; color: #235546; background: #eaf4ed; }
+.saved-check { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: white; background: #2e7d5d; font-size: .72rem; font-weight: 900; }
+.plan-saved > span:nth-child(2) { display: flex; flex-direction: column; }
+.plan-saved strong { font-size: .72rem; }
+.plan-saved small { margin-top: 3px; color: #638072; font-size: .55rem; }
+.saved-version { color: #5d786b; font-size: .5rem; font-weight: 800; letter-spacing: .12em; }
+.approval-proof { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-top: 11px; color: #87958d; font-size: .5rem; }
 .proof-token { flex: none; display: flex; flex-direction: column; align-items: flex-end; }
 .proof-token span { color: #8a9890; font-size: .48rem; font-weight: 800; letter-spacing: .13em; }
 .proof-token strong { margin-top: 3px; color: #466456; font-size: .58rem; }
@@ -243,6 +254,10 @@ a { color: inherit; text-decoration: none; }
   .plan-steps { grid-template-columns: 1fr; }
   .plan-steps li::after { display: none; }
   .plan-review { align-items: flex-start; flex-direction: column; }
+  .approve-button { width: 100%; justify-content: center; }
+  .approval-proof { align-items: flex-start; flex-direction: column; }
+  .plan-saved { grid-template-columns: auto 1fr; }
+  .saved-version { grid-column: 2; }
   .proof-token { align-items: flex-start; }
   .guardian-card { grid-template-columns: auto 1fr; }
   .guardian-card .secondary-button { grid-column: 1 / -1; }
