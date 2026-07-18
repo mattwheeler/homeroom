@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export type ToolStage =
   | "orientation"
+  | "morning_plan"
   | "plan_gathering"
   | "plan_save"
   | "source_sync"
@@ -56,6 +57,12 @@ const stringProperties = (...names: string[]) =>
   Object.fromEntries(names.map((name) => [name, { type: "string" as const }])) as Record<string, JsonProperty>;
 
 const schemas = {
+  get_morning_plan_context: defineTool(
+    "get_morning_plan_context",
+    "Read Emily's allowlisted band-camp event, packing list, guardian task, and planning preferences.",
+    stringProperties("sessionId", "studentId"),
+    z.object({ sessionId: id, studentId: id }).strict()
+  ),
   list_courses: defineTool(
     "list_courses",
     "List the fictional student's approved course records.",
@@ -180,6 +187,7 @@ type ToolName = keyof typeof schemas;
 
 const stageToolNames: Record<ToolStage, readonly ToolName[]> = {
   orientation: ["list_courses", "list_upcoming_events", "list_guardian_actions", "list_readiness_activities"],
+  morning_plan: ["get_morning_plan_context"],
   plan_gathering: ["get_event_details", "read_material", "get_guardian_action", "get_student_plan_preferences"],
   plan_save: ["save_personal_plan"],
   source_sync: ["sync_activity_calendar", "get_source_change"],
@@ -195,7 +203,7 @@ export function getStageTools(stage: ToolStage): FunctionToolDefinition[] {
 }
 
 export function isReadOnlyStage(stage: ToolStage) {
-  return ["orientation", "plan_gathering", "learning_hint", "guardian_view"].includes(stage);
+  return ["orientation", "morning_plan", "plan_gathering", "learning_hint", "guardian_view"].includes(stage);
 }
 
 export function validateToolArguments(stage: ToolStage, name: string, args: unknown): unknown {

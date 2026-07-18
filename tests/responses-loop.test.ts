@@ -15,14 +15,16 @@ describe("Responses API continuation loop", () => {
             name: "list_courses",
             arguments: JSON.stringify({ sessionId: "session_1", studentId: "student_emily" })
           }
-        ]
+        ],
+        usage: { inputTokens: 100, outputTokens: 20, cachedTokens: 10 }
       })
       .mockResolvedValueOnce({
         id: "resp_2",
         model: "gpt-5.6-sol",
         output: [
           { type: "message", content: [{ type: "output_text", text: "Seven classes are ready." }] }
-        ]
+        ],
+        usage: { inputTokens: 140, outputTokens: 40, cachedTokens: 30 }
       });
     const toolExecutor = vi.fn().mockResolvedValue({ courses: ["Algebra I"] });
 
@@ -35,6 +37,7 @@ describe("Responses API continuation loop", () => {
 
     expect(result.text).toBe("Seven classes are ready.");
     expect(result.trace.responseIds).toEqual(["resp_1", "resp_2"]);
+    expect(result.trace.usage).toEqual({ inputTokens: 240, outputTokens: 60, cachedTokens: 40 });
     expect(create.mock.calls[0][0]).toMatchObject({
       model: "gpt-5.6-sol",
       reasoning: { effort: "low", context: "current_turn" },

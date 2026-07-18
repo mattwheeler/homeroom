@@ -2,6 +2,18 @@ import { describe, expect, it } from "vitest";
 import { getStageTools, validateToolArguments } from "../lib/ai/tool-registry";
 
 describe("stage-scoped function tools", () => {
+  it("exposes one read-only context tool for the live morning-plan slice", () => {
+    const tools = getStageTools("morning_plan");
+    expect(tools.map((tool) => tool.name)).toEqual(["get_morning_plan_context"]);
+    expect(tools[0]).toMatchObject({
+      strict: true,
+      parameters: {
+        required: ["sessionId", "studentId"],
+        additionalProperties: false
+      }
+    });
+  });
+
   it("exposes only orientation reads during orientation", () => {
     const names = getStageTools("orientation").map((tool) => tool.name);
     expect(names).toEqual([

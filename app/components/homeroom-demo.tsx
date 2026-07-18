@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, useSyncExternalStore, type CSSProperties } from "react";
 
 interface Student {
   name: string;
@@ -27,6 +27,25 @@ interface DemoResponse {
   profile: Student;
 }
 
+interface MorningPlan {
+  title: string;
+  intro: string;
+  steps: Array<{ time: string; title: string; detail: string; sourceLabel: string }>;
+  guardianNote: string;
+  encouragement: string;
+  approvalPrompt: string;
+}
+
+interface MorningPlanResponse {
+  plan: MorningPlan;
+  proof: {
+    model: string;
+    responseIds: string[];
+    tools: string[];
+    sourceVersion: number;
+  };
+}
+
 const Icon = ({ name }: { name: "spark" | "calendar" | "book" | "shield" | "arrow" | "clock" }) => {
   const paths = {
     spark: <path d="M12 2.8c.45 4.25 2.95 6.75 7.2 7.2-4.25.45-6.75 2.95-7.2 7.2-.45-4.25-2.95-6.75-7.2-7.2 4.25-.45 6.75-2.95 7.2-7.2Z" />,
@@ -39,9 +58,18 @@ const Icon = ({ name }: { name: "spark" | "calendar" | "book" | "shield" | "arro
   return <svg aria-hidden="true" className="icon" viewBox="0 0 24 24">{paths[name]}</svg>;
 };
 
+const subscribeToHydration = () => () => {};
+const clientHydrationSnapshot = () => true;
+const serverHydrationSnapshot = () => false;
+
 export function HomeroomDemo({ student, courses, bandCamp }: { student: Student; courses: readonly Course[]; bandCamp: BandCamp }) {
+  const hydrated = useSyncExternalStore(subscribeToHydration, clientHydrationSnapshot, serverHydrationSnapshot);
   const [status, setStatus] = useState<"ready" | "starting" | "active" | "error">("ready");
   const [error, setError] = useState("");
+  const [csrfToken, setCsrfToken] = useState("");
+  const [planStatus, setPlanStatus] = useState<"idle" | "building" | "ready" | "error">("idle");
+  const [planError, setPlanError] = useState("");
+  const [morningPlan, setMorningPlan] = useState<MorningPlanResponse | null>(null);
 
   async function startDemo() {
     setStatus("starting");
@@ -54,11 +82,40 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
       });
       const data = (await response.json()) as DemoResponse | { error?: { message?: string } };
       if (!response.ok) throw new Error("error" in data ? data.error?.message : "Unable to start the demo.");
-      sessionStorage.setItem("homeroom_csrf", (data as DemoResponse).csrfToken);
+      setCsrfToken((data as DemoResponse).csrfToken);
       setStatus("active");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to start the demo.");
       setStatus("error");
+    }
+  }
+
+  async function buildMorningPlan() {
+    if (!csrfToken) {
+      setPlanError("Start a new Homeroom session before building your plan.");
+      setPlanStatus("error");
+      return;
+    }
+    setPlanStatus("building");
+    setPlanError("");
+    try {
+      const response = await fetch("/api/morning-plan", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: "{}"
+      });
+      const data = (await response.json()) as MorningPlanResponse | { error?: { message?: string } };
+      if (!response.ok || !("plan" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to build your morning plan.");
+      }
+      setMorningPlan(data);
+      setPlanStatus("ready");
+    } catch (caught) {
+      setPlanError(caught instanceof Error ? caught.message : "Unable to build your morning plan.");
+      setPlanStatus("error");
     }
   }
 
@@ -110,8 +167,8 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
               <p className="eyebrow">YOUR DAY, ORGANIZED</p>
               <h2>Let&apos;s get you ready for band camp.</h2>
               <p>Homeroom found one upcoming event, one guardian task, and a simple way to keep your classes fresh.</p>
-              <button className="primary-button" disabled={status === "starting"} onClick={startDemo}>
-                {status === "starting" ? "Getting your day ready…" : "Start my day"}
+              <button className="primary-button" disabled={!hydrated || status === "starting"} onClick={startDemo}>
+                {!hydrated ? "Loading Homeroom…" : status === "starting" ? "Getting your day ready…" : "Start my day"}
                 {status !== "starting" && <Icon name="arrow" />}
               </button>
               {status === "error" && <p className="error-message">{error}</p>}
@@ -131,7 +188,59 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                   <div><span className="time-dot arrive" /><small>CHECK IN</small><strong>{bandCamp.checkIn} AM</strong></div>
                   <div><span className="time-dot start" /><small>CAMP STARTS</small><strong>{bandCamp.start} AM</strong></div>
                 </div>
-                <button className="text-button">Build my morning plan <Icon name="arrow" /></button>
+                <button
+                  aria-controls="morning-plan-proposal"
+                  className="text-button plan-trigger"
+                  disabled={planStatus === "building"}
+                  onClick={buildMorningPlan}
+                >
+                  {planStatus === "building"
+                    ? "Building from your approved sources…"
+                    : morningPlan
+                      ? "Build it again"
+                      : "Build my morning plan"}
+                  {planStatus !== "building" && <Icon name="arrow" />}
+                </button>
+                {planStatus === "error" && <p className="plan-error" role="alert">{planError}</p>}
+                {morningPlan && (
+                  <section className="morning-plan" id="morning-plan-proposal" aria-live="polite">
+                    <div className="plan-proof-row">
+                      <span className="live-model"><span className="live-dot" /> Live GPT-5.6 Sol</span>
+                      <span>Source version {morningPlan.proof.sourceVersion}</span>
+                      <span>{morningPlan.proof.tools.length} approved tool</span>
+                    </div>
+                    <div className="plan-copy">
+                      <p className="eyebrow">PROPOSED FOR EMILY</p>
+                      <h3>{morningPlan.plan.title}</h3>
+                      <p>{morningPlan.plan.intro}</p>
+                    </div>
+                    <ol className="plan-steps">
+                      {morningPlan.plan.steps.map((step) => (
+                        <li key={`${step.time}-${step.title}`}>
+                          <time>{step.time}</time>
+                          <span className="plan-step-marker" />
+                          <div>
+                            <strong>{step.title}</strong>
+                            <p>{step.detail}</p>
+                            <small>{step.sourceLabel}</small>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                    <div className="plan-guardian-note"><Icon name="shield" /><span>{morningPlan.plan.guardianNote}</span></div>
+                    <blockquote>{morningPlan.plan.encouragement}</blockquote>
+                    <div className="plan-review">
+                      <div>
+                        <strong>{morningPlan.plan.approvalPrompt}</strong>
+                        <small>Nothing has been saved yet</small>
+                      </div>
+                      <div className="proof-token" title={morningPlan.proof.model}>
+                        <span>MODEL TRACE</span>
+                        <strong>{morningPlan.proof.responseIds.length} responses verified</strong>
+                      </div>
+                    </div>
+                  </section>
+                )}
               </section>
 
               <section className="prep-card card">

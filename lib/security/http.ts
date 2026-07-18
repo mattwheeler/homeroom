@@ -39,6 +39,21 @@ export function serializeSessionCookie(
   return parts.join("; ");
 }
 
+export function readCookie(request: Request, name: string): string | null {
+  const header = request.headers.get("cookie");
+  if (!header) return null;
+  for (const pair of header.split(";")) {
+    const separator = pair.indexOf("=");
+    if (separator < 0 || pair.slice(0, separator).trim() !== name) continue;
+    try {
+      return decodeURIComponent(pair.slice(separator + 1).trim());
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function constantTimeEqual(left: string, right: string): boolean {
   const length = Math.max(left.length, right.length);
   let difference = left.length ^ right.length;
