@@ -1,0 +1,20 @@
+import handler from "vinext/server/app-router-entry";
+
+interface ExecutionContextLike {
+  waitUntil(promise: Promise<unknown>): void;
+  passThroughOnException(): void;
+}
+
+interface WorkerBindingsLike {
+  ASSETS?: { fetch(request: Request): Promise<Response> | Response };
+  HOMEROOM_DB?: unknown;
+  SESSION_SIGNING_SECRET?: string;
+}
+
+const worker = {
+  fetch(request: Request, bindings: WorkerBindingsLike, context: ExecutionContextLike) {
+    return handler.fetch(request, bindings, context);
+  }
+};
+
+export default worker;

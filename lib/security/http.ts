@@ -1,0 +1,56 @@
+export class HttpSecurityError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "HttpSecurityError";
+  }
+}
+
+export function assertSameOrigin(request: Request): void {
+  const origin = request.headers.get("origin");
+  if (!origin) throw new HttpSecurityError(403, "A same-origin request is required.");
+  let requestOrigin: string;
+  try {
+    requestOrigin = new URL(request.url).origin;
+  } catch {
+    throw new HttpSecurityError(403, "The request origin is invalid.");
+  }
+  if (origin !== requestOrigin) throw new HttpSecurityError(403, "The request origin is not allowed.");
+}
+
+export function assertJsonRequest(request: Request): void {
+  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.startsWith("application/json")) {
+    throw new HttpSecurityError(415, "A JSON request body is required.");
+  }
+}
+
+export function serializeSessionCookie(
+  token: string,
+  options: { secure: boolean; maxAgeSeconds: number }
+): string {
+  const parts = [
+    `homeroom_session=${encodeURIComponent(token)}`,
+    "HttpOnly",
+    "SameSite=Strict",
+    "Path=/",
+    `Max-Age=${Math.max(0, Math.floor(options.maxAgeSeconds))}`
+  ];
+  if (options.secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
+function constantTimeEqual(left: string, right: string): boolean {
+  const length = Math.max(left.length, right.length);
+  let difference = left.length ^ right.length;
+  for (let index = 0; index < length; index += 1) {
+    difference |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+  }
+  return difference === 0;
+}
+
+export async function verifyCsrfToken(token: string, expectedHash: string): Promise<boolean> {
+  if (!/^[a-f0-9]{64}$/.test(expectedHash)) return false;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  const actualHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return constantTimeEqual(actualHash, expectedHash);
+}
