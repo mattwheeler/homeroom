@@ -36,7 +36,7 @@ const revision = {
   }
 };
 
-test("Emily saves Plan V1, reviews a BAND source change, and explicitly saves Plan V2", async ({ page }) => {
+test("Emily saves both plans and completes a hint-led Algebra refresher", async ({ page }) => {
   await page.route("**/api/demo-sessions", async (route) => {
     await route.fulfill({
       status: 201,
@@ -142,6 +142,73 @@ test("Emily saves Plan V1, reviews a BAND source change, and explicitly saves Pl
       })
     });
   });
+  await page.route("**/api/practice/start", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    expect(route.request().postDataJSON()).toEqual({});
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        exercise: { id: "linear_equation_01", course: "Algebra I", prompt: "3(x + 2) = 18" },
+        hint: {
+          title: "Undo one layer",
+          encouragement: "You only need to choose the first move.",
+          question: "Which operation would undo the multiplication wrapped around the parentheses?",
+          concept: "inverse operations",
+          answerPolicy: "hidden"
+        },
+        progress: { hintsUsed: 1, attempts: 0, stateVersion: 11 },
+        proof: {
+          model: "gpt-5.6-sol-2026-07-15",
+          responseIds: ["resp_exercise", "resp_hint"],
+          tools: ["get_practice_exercise"],
+          exerciseId: "linear_equation_01"
+        }
+      })
+    });
+  });
+  let practiceAttempt = 0;
+  await page.route("**/api/practice/attempt", async (route) => {
+    practiceAttempt += 1;
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    if (practiceAttempt === 1) {
+      expect(route.request().postDataJSON()).toEqual({
+        kind: "first_step", answer: "divide_both_sides_by_3"
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          correct: true,
+          completed: false,
+          equation: "x + 2 = 6",
+          feedback: "Exactly. You used the inverse operation on both sides.",
+          next: { kind: "final_answer", prompt: "What operation undoes +2? What is x?" },
+          proof: { grader: "homeroom-deterministic-v1", attempts: 1, stateVersion: 11 }
+        })
+      });
+      return;
+    }
+    expect(route.request().postDataJSON()).toEqual({ kind: "final_answer", answer: "4" });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        correct: true,
+        completed: true,
+        answer: "x = 4",
+        celebration: "You solved it one step at a time.",
+        proof: {
+          grader: "homeroom-deterministic-v1",
+          exerciseId: "linear_equation_01",
+          hintsUsed: 1,
+          attempts: 2,
+          stateVersion: 12,
+          completedAt: "2026-07-18T12:12:00.000Z"
+        }
+      })
+    });
+  });
 
   await page.goto("/");
   await page.getByRole("button", { name: "Start my day" }).click();
@@ -166,4 +233,15 @@ test("Emily saves Plan V1, reviews a BAND source change, and explicitly saves Pl
   await page.getByRole("button", { name: "Approve and save Plan V2" }).click();
   await expect(page.getByText("Plan V2 saved", { exact: true })).toBeVisible();
   await expect(page.getByText("Saved by Emily · Source version 2", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Start Algebra refresher" }).click();
+  await expect(page.getByRole("heading", { name: "Undo one layer" })).toBeVisible();
+  await expect(page.getByText("Live GPT-5.6 Sol hint", { exact: true })).toBeVisible();
+  await expect(page.getByText("Answer hidden until you solve it", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Divide both sides by 3" }).click();
+  await expect(page.getByText("x + 2 = 6", { exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "What is x?" }).fill("4");
+  await page.getByRole("button", { name: "Check my answer" }).click();
+  await expect(page.getByText("Practice complete", { exact: true })).toBeVisible();
+  await expect(page.getByText("You solved it one step at a time.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Deterministically graded · 2 attempts · 1 hint", { exact: true })).toBeVisible();
 });

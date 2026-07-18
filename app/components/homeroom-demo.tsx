@@ -108,6 +108,48 @@ interface SavedPlanV2Response {
   };
 }
 
+interface PracticeStartResponse {
+  exercise: { id: string; course: "Algebra I"; prompt: string };
+  hint: {
+    title: string;
+    encouragement: string;
+    question: string;
+    concept: "inverse operations";
+    answerPolicy: "hidden";
+  };
+  progress: { hintsUsed: 1; attempts: 0; stateVersion: number };
+  proof: {
+    model: string;
+    responseIds: string[];
+    tools: string[];
+    exerciseId: string;
+  };
+}
+
+interface PracticeStepResponse {
+  correct: boolean;
+  completed: false;
+  equation?: string;
+  feedback: string;
+  next?: { kind: "final_answer"; prompt: string };
+  proof: { grader: "homeroom-deterministic-v1"; attempts: number; stateVersion: number };
+}
+
+interface PracticeCompleteResponse {
+  correct: true;
+  completed: true;
+  answer: "x = 4";
+  celebration: string;
+  proof: {
+    grader: "homeroom-deterministic-v1";
+    exerciseId: string;
+    hintsUsed: number;
+    attempts: number;
+    stateVersion: number;
+    completedAt: string;
+  };
+}
+
 function displayClock(time: string): string {
   const [hours, minutes] = time.split(":").map(Number);
   const suffix = (hours ?? 0) >= 12 ? "PM" : "AM";
@@ -148,6 +190,14 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
   const [v2ApprovalStatus, setV2ApprovalStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [v2ApprovalError, setV2ApprovalError] = useState("");
   const [savedPlanV2, setSavedPlanV2] = useState<SavedPlanV2Response | null>(null);
+  const [practiceStatus, setPracticeStatus] = useState<"idle" | "starting" | "active" | "complete" | "error">("idle");
+  const [practiceError, setPracticeError] = useState("");
+  const [practiceLesson, setPracticeLesson] = useState<PracticeStartResponse | null>(null);
+  const [practiceStep, setPracticeStep] = useState<PracticeStepResponse | null>(null);
+  const [practiceFeedback, setPracticeFeedback] = useState("");
+  const [practiceAttemptStatus, setPracticeAttemptStatus] = useState<"idle" | "checking">("idle");
+  const [finalAnswer, setFinalAnswer] = useState("");
+  const [practiceComplete, setPracticeComplete] = useState<PracticeCompleteResponse | null>(null);
   const displayedBandCamp = planRevision
     ? {
         wake: planRevision.revision.plan.steps[0]!.time,
@@ -286,6 +336,89 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
     } catch (caught) {
       setV2ApprovalError(caught instanceof Error ? caught.message : "Unable to save Plan V2.");
       setV2ApprovalStatus("error");
+    }
+  }
+
+  async function startAlgebraPractice() {
+    if (!csrfToken || !savedPlanV2) return;
+    setPracticeStatus("starting");
+    setPracticeError("");
+    try {
+      const response = await fetch("/api/practice/start", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: "{}"
+      });
+      const data = (await response.json()) as PracticeStartResponse | { error?: { message?: string } };
+      if (!response.ok || !("hint" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to start the Algebra refresher.");
+      }
+      setPracticeLesson(data);
+      setPracticeStatus("active");
+    } catch (caught) {
+      setPracticeError(caught instanceof Error ? caught.message : "Unable to start the Algebra refresher.");
+      setPracticeStatus("error");
+    }
+  }
+
+  async function submitFirstPracticeStep(answer: "divide_both_sides_by_3" | "subtract_3" | "multiply_both_sides_by_3") {
+    if (!csrfToken || !practiceLesson) return;
+    setPracticeAttemptStatus("checking");
+    setPracticeError("");
+    try {
+      const response = await fetch("/api/practice/attempt", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: JSON.stringify({ kind: "first_step", answer })
+      });
+      const data = (await response.json()) as PracticeStepResponse | { error?: { message?: string } };
+      if (!response.ok || !("correct" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to check that step.");
+      }
+      setPracticeFeedback(data.feedback);
+      if (data.correct) setPracticeStep(data);
+    } catch (caught) {
+      setPracticeError(caught instanceof Error ? caught.message : "Unable to check that step.");
+    } finally {
+      setPracticeAttemptStatus("idle");
+    }
+  }
+
+  async function submitFinalPracticeAnswer(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!csrfToken || !practiceStep || !finalAnswer.trim()) return;
+    setPracticeAttemptStatus("checking");
+    setPracticeError("");
+    try {
+      const response = await fetch("/api/practice/attempt", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-homeroom-csrf": csrfToken
+        },
+        body: JSON.stringify({ kind: "final_answer", answer: finalAnswer.trim() })
+      });
+      const data = (await response.json()) as PracticeStepResponse | PracticeCompleteResponse | { error?: { message?: string } };
+      if (!response.ok || !("correct" in data)) {
+        throw new Error("error" in data ? data.error?.message : "Unable to check your answer.");
+      }
+      if (data.completed) {
+        setPracticeComplete(data);
+        setPracticeStatus("complete");
+        setPracticeFeedback("");
+      } else {
+        setPracticeFeedback(data.feedback);
+      }
+    } catch (caught) {
+      setPracticeError(caught instanceof Error ? caught.message : "Unable to check your answer.");
+    } finally {
+      setPracticeAttemptStatus("idle");
     }
   }
 
@@ -559,11 +692,106 @@ export function HomeroomDemo({ student, courses, bandCamp }: { student: Student;
                 <div className="section-heading"><div><p className="eyebrow">TODAY&apos;S QUICK WIN</p><h2>10-minute tune-up</h2></div><span className="duration"><Icon name="clock" /> 10 min</span></div>
                 <div className="prep-list">
                   <label><input type="checkbox" defaultChecked /><span><strong>Warm up your instrument</strong><small>Long tones · 4 minutes</small></span></label>
-                  <label><input type="checkbox" /><span><strong>One Algebra refresher</strong><small>Solve 3(x + 2) = 18</small></span></label>
+                  <div className={`prep-practice-row ${practiceStatus === "complete" ? "complete" : ""}`}>
+                    <span className="practice-check" aria-hidden="true">{practiceStatus === "complete" ? "✓" : ""}</span>
+                    <span><strong>One Algebra refresher</strong><small>Solve 3(x + 2) = 18 · hints, not answers</small></span>
+                    {practiceLesson ? (
+                      <span className="practice-row-status">{practiceStatus === "complete" ? "Done" : "In progress"}</span>
+                    ) : (
+                      <button
+                        className="practice-start-button"
+                        disabled={!savedPlanV2 || practiceStatus === "starting"}
+                        onClick={startAlgebraPractice}
+                      >
+                        {!savedPlanV2
+                          ? "Save Plan V2 first"
+                          : practiceStatus === "starting"
+                            ? "Preparing your hint…"
+                            : "Start Algebra refresher"}
+                      </button>
+                    )}
+                  </div>
                   <label><input type="checkbox" /><span><strong>Check the packing list</strong><small>Six essentials from your band director</small></span></label>
                 </div>
-                <div className="progress-line"><span /></div>
-                <small className="progress-copy">1 of 3 ready</small>
+                {practiceLesson && (
+                  <section className="practice-workspace" aria-live="polite">
+                    <div className="practice-proof-row">
+                      <span className="live-model"><span className="live-dot" /> Live GPT-5.6 Sol hint</span>
+                      <span>Hint {practiceLesson.progress.hintsUsed} of 1</span>
+                      <span className="answer-hidden"><Icon name="shield" /> Answer hidden until you solve it</span>
+                    </div>
+                    {practiceComplete ? (
+                      <div className="practice-celebration" role="status">
+                        <span className="celebration-mark" aria-hidden="true">✓</span>
+                        <p className="eyebrow">PRACTICE COMPLETE</p>
+                        <h3>Practice complete</h3>
+                        <div className="completed-equation">{practiceComplete.answer}</div>
+                        <p>{practiceComplete.celebration}</p>
+                        <small>
+                          Deterministically graded · {practiceComplete.proof.attempts} attempts · {practiceComplete.proof.hintsUsed} hint
+                        </small>
+                        <span className="practice-state">STATE {practiceComplete.proof.stateVersion}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="practice-heading">
+                          <div>
+                            <p className="eyebrow">ALGEBRA I · INVERSE OPERATIONS</p>
+                            <h3>{practiceLesson.hint.title}</h3>
+                            <p>{practiceLesson.hint.encouragement}</p>
+                          </div>
+                          <div className="practice-equation" aria-label={`Solve ${practiceLesson.exercise.prompt}`}>
+                            {practiceLesson.exercise.prompt}
+                          </div>
+                        </div>
+                        {!practiceStep ? (
+                          <div className="practice-question">
+                            <strong>{practiceLesson.hint.question}</strong>
+                            <div className="practice-choices">
+                              <button disabled={practiceAttemptStatus === "checking"} onClick={() => submitFirstPracticeStep("divide_both_sides_by_3")}>Divide both sides by 3</button>
+                              <button disabled={practiceAttemptStatus === "checking"} onClick={() => submitFirstPracticeStep("subtract_3")}>Subtract 3 from both sides</button>
+                              <button disabled={practiceAttemptStatus === "checking"} onClick={() => submitFirstPracticeStep("multiply_both_sides_by_3")}>Multiply both sides by 3</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="practice-final-step">
+                            <div className="validated-step">
+                              <span>✓</span>
+                              <div><small>STEP VERIFIED BY HOMEROOM</small><strong>{practiceStep.equation}</strong></div>
+                            </div>
+                            <form onSubmit={submitFinalPracticeAnswer}>
+                              <label htmlFor="final-algebra-answer">{practiceStep.next?.prompt}</label>
+                              <div className="answer-entry">
+                                <span>x =</span>
+                                <input
+                                  id="final-algebra-answer"
+                                  aria-label="What is x?"
+                                  autoComplete="off"
+                                  inputMode="decimal"
+                                  maxLength={16}
+                                  value={finalAnswer}
+                                  onChange={(event) => setFinalAnswer(event.target.value)}
+                                />
+                                <button disabled={practiceAttemptStatus === "checking" || !finalAnswer.trim()} type="submit">
+                                  {practiceAttemptStatus === "checking" ? "Checking…" : "Check my answer"}
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        )}
+                        {practiceFeedback && <p className={`practice-feedback ${practiceStep ? "correct" : ""}`}>{practiceFeedback}</p>}
+                        {practiceError && <p className="approval-error" role="alert">{practiceError}</p>}
+                        <div className="practice-boundary">
+                          <span>GPT coaches the next move</span>
+                          <span>Homeroom code grades every step</span>
+                        </div>
+                      </>
+                    )}
+                  </section>
+                )}
+                {practiceStatus === "error" && <p className="approval-error" role="alert">{practiceError}</p>}
+                <div className={`progress-line ${practiceStatus === "complete" ? "practice-done" : ""}`}><span /></div>
+                <small className="progress-copy">{practiceStatus === "complete" ? "2 of 3 ready" : "1 of 3 ready"}</small>
               </section>
 
               <section className="classes-card card">
