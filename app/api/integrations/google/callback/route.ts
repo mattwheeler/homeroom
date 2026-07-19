@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     !env.SOURCE_TOKEN_ENCRYPTION_KEY || env.SOURCE_TOKEN_ENCRYPTION_KEY.length < 32 ||
     !env.GOOGLE_CLASSROOM_CLIENT_ID ||
     !env.GOOGLE_CLASSROOM_CLIENT_SECRET ||
-    !env.GOOGLE_CLASSROOM_REDIRECT_URI
+    !env.GOOGLE_IDENTITY_REDIRECT_URI
   ) {
     return Response.redirect(new URL("/?source=google-not-configured#sources", request.url), 303);
   }
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       sourceEncryptionSecret: env.SOURCE_TOKEN_ENCRYPTION_KEY!,
       googleClientId: env.GOOGLE_CLASSROOM_CLIENT_ID!,
       googleClientSecret: env.GOOGLE_CLASSROOM_CLIENT_SECRET!,
-      googleRedirectUri: env.GOOGLE_CLASSROOM_REDIRECT_URI!
+      googleRedirectUri: env.GOOGLE_IDENTITY_REDIRECT_URI!
     })
   });
 }

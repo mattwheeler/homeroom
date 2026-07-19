@@ -118,6 +118,12 @@ describe("live Plan V2 revision generation", () => {
     expect(create.mock.calls[1][0].input).toContainEqual(expect.objectContaining({
       output: expect.stringContaining('"time":"07:30"')
     }));
+    expect(create.mock.calls[1][0].input).toContainEqual(expect.objectContaining({
+      output: expect.stringContaining('"developmentalStage":"early_high_school"')
+    }));
+    expect(create.mock.calls[1][0].input).toContainEqual(expect.objectContaining({
+      output: expect.stringContaining('"worked_example_or_organizer"')
+    }));
     expect(traceStore.records).toEqual([
       expect.objectContaining({
         id: "turn_revision_01",

@@ -79,7 +79,6 @@ export async function generatePracticeHint(input: {
 }) {
   if (
     input.session.role !== "student" ||
-    input.session.actorId !== "student_emily" ||
     input.session.state.phase !== "PLAN_V2_SAVED" ||
     input.session.state.sourceVersion !== 2 ||
     input.session.state.activePlanVersion !== 2

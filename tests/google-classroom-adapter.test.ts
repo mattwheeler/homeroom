@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GOOGLE_CLASSROOM_SCOPES,
   GoogleClassroomAdapter,
+  GoogleClassroomSourceError,
   classifyClassroomCourse,
   createGoogleClassroomAuthorizationUrl,
   exchangeGoogleAuthorizationCode,
@@ -10,12 +11,11 @@ import {
 } from "../lib/source/google-classroom";
 
 describe("read-only Google Classroom source adapter", () => {
-  it("requests only student-scoped read-only permissions with OAuth state and PKCE", async () => {
+  it("requests only student-scoped read-only permissions using Google's web-server flow", async () => {
     const authorizationUrl = await createGoogleClassroomAuthorizationUrl({
       clientId: "google-client-id.apps.googleusercontent.com",
       redirectUri: "https://homeroom.example/api/integrations/google/callback",
-      state: "state_12345678901234567890123456789012",
-      codeVerifier: "verifier_123456789012345678901234567890123456789012345678"
+      state: "state_12345678901234567890123456789012"
     });
     const url = new URL(authorizationUrl);
 
@@ -24,8 +24,8 @@ describe("read-only Google Classroom source adapter", () => {
     expect(url.searchParams.get("access_type")).toBe("offline");
     expect(url.searchParams.get("include_granted_scopes")).toBe("true");
     expect(url.searchParams.get("state")).toBe("state_12345678901234567890123456789012");
-    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
-    expect(url.searchParams.get("code_challenge")).not.toContain("verifier");
+    expect(url.searchParams.has("code_challenge_method")).toBe(false);
+    expect(url.searchParams.has("code_challenge")).toBe(false);
     expect(url.searchParams.get("scope")?.split(" ").sort()).toEqual([...GOOGLE_CLASSROOM_SCOPES].sort());
     expect(url.searchParams.get("scope")).not.toMatch(/classroom\.courses(?:\s|$)/);
     expect(url.searchParams.get("scope")).not.toMatch(/coursework\.me(?:\s|$)/);
@@ -49,13 +49,10 @@ describe("read-only Google Classroom source adapter", () => {
     const valid = {
       clientId: "client.apps.googleusercontent.com",
       redirectUri: "https://homeroom.example/api/integrations/google/callback",
-      state: "s".repeat(43),
-      codeVerifier: "v".repeat(64)
+      state: "s".repeat(43)
     };
     await expect(createGoogleClassroomAuthorizationUrl({ ...valid, clientId: "short" })).rejects.toThrow(/client/i);
     await expect(createGoogleClassroomAuthorizationUrl({ ...valid, state: "short" })).rejects.toThrow(/state/i);
-    await expect(createGoogleClassroomAuthorizationUrl({ ...valid, codeVerifier: "short" })).rejects.toThrow(/verifier/i);
-    await expect(createGoogleClassroomAuthorizationUrl({ ...valid, codeVerifier: "v".repeat(129) })).rejects.toThrow(/verifier/i);
     await expect(createGoogleClassroomAuthorizationUrl({ ...valid, redirectUri: "http://attacker.example/callback" })).rejects.toThrow(/https/i);
     await expect(createGoogleClassroomAuthorizationUrl({ ...valid, redirectUri: "https://user:pass@homeroom.example/callback" })).rejects.toThrow(/invalid/i);
     await expect(createGoogleClassroomAuthorizationUrl({ ...valid, redirectUri: "http://127.0.0.1:3000/callback" })).resolves.toContain("accounts.google.com");
@@ -177,6 +174,21 @@ describe("read-only Google Classroom source adapter", () => {
     await expect(tooMany.syncStudentSnapshot("access-token")).rejects.toThrow(/too many/i);
   });
 
+  it("uses portable manual redirect handling and refuses Classroom redirects", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, {
+      status: 302,
+      headers: { location: "https://attacker.example/classroom" }
+    }));
+    const failure = new GoogleClassroomAdapter({ fetcher }).syncStudentSnapshot("access-token");
+
+    await expect(failure).rejects.toBeInstanceOf(GoogleClassroomSourceError);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({
+      method: "GET",
+      redirect: "manual"
+    });
+  });
+
   it("normalizes absent optional coursework and submission fields", async () => {
     const fetcher = vi.fn(async (input: string | URL | Request) => {
       const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
@@ -228,7 +240,6 @@ describe("read-only Google Classroom source adapter", () => {
 
     const exchanged = await exchangeGoogleAuthorizationCode({
       code: "authorization-code",
-      codeVerifier: "verifier_123456789012345678901234567890123456789012345678",
       clientId: "client.apps.googleusercontent.com",
       clientSecret: "client-secret",
       redirectUri: "https://homeroom.example/api/integrations/google/callback",
@@ -246,9 +257,9 @@ describe("read-only Google Classroom source adapter", () => {
     for (const call of fetcher.mock.calls) {
       expect(call[0]).toBe("https://oauth2.googleapis.com/token");
       expect(String(call[0])).not.toContain("client-secret");
-      expect(call[1]).toMatchObject({ method: "POST", redirect: "error" });
+      expect(call[1]).toMatchObject({ method: "POST", redirect: "manual" });
     }
-    expect(String(fetcher.mock.calls[0][1]?.body)).toContain("code_verifier=");
+    expect(String(fetcher.mock.calls[0][1]?.body)).not.toContain("code_verifier=");
     expect(String(fetcher.mock.calls[1][1]?.body)).toContain("grant_type=refresh_token");
   });
 
@@ -256,17 +267,85 @@ describe("read-only Google Classroom source adapter", () => {
     const fetcher = vi.fn();
     const exchangeBase = {
       code: "code",
-      codeVerifier: "v".repeat(64),
       clientId: "client.apps.googleusercontent.com",
       clientSecret: "secret",
       redirectUri: "https://homeroom.example/callback",
       fetcher
     };
     await expect(exchangeGoogleAuthorizationCode({ ...exchangeBase, code: "" })).rejects.toThrow(/code/i);
-    await expect(exchangeGoogleAuthorizationCode({ ...exchangeBase, codeVerifier: "short" })).rejects.toThrow(/verifier/i);
     await expect(exchangeGoogleAuthorizationCode({ ...exchangeBase, clientSecret: "" })).rejects.toThrow(/configured/i);
     await expect(refreshGoogleAccessToken({ refreshToken: "", clientId: "client", clientSecret: "secret", fetcher })).rejects.toThrow(/credentials/i);
     await expect(refreshGoogleAccessToken({ refreshToken: "refresh", clientId: "", clientSecret: "secret", fetcher })).rejects.toThrow(/configured/i);
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("classifies Google token errors without retaining provider response details", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json({
+      error: "invalid_grant",
+      error_description: "authorization-code-and-provider-detail"
+    }, { status: 400 }));
+    const failure = exchangeGoogleAuthorizationCode({
+      code: "authorization-code",
+      clientId: "client.apps.googleusercontent.com",
+      clientSecret: "client-secret",
+      redirectUri: "https://homeroom.example/api/integrations/google/callback",
+      fetcher
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(GoogleClassroomSourceError);
+    await expect(failure).rejects.toMatchObject({
+      code: "GOOGLE_TOKEN_INVALID_GRANT",
+      message: "Google rejected the authorization grant."
+    });
+    await expect(failure).rejects.not.toThrow(/authorization-code-and-provider-detail/);
+  });
+
+  it("separates token transport failures from invalid successful responses", async () => {
+    const common = {
+      code: "authorization-code",
+      clientId: "client.apps.googleusercontent.com",
+      clientSecret: "client-secret",
+      redirectUri: "https://homeroom.example/api/integrations/google/callback"
+    };
+    const networkFailure = exchangeGoogleAuthorizationCode({
+      ...common,
+      fetcher: vi.fn().mockRejectedValue(new TypeError("network-provider-detail"))
+    });
+    await expect(networkFailure).rejects.toMatchObject({
+      name: "GoogleClassroomSourceError",
+      code: "GOOGLE_TOKEN_NETWORK_FAILED",
+      message: "Google's token service could not be reached."
+    });
+    await expect(networkFailure).rejects.not.toThrow(/network-provider-detail/);
+
+    const responseFailure = exchangeGoogleAuthorizationCode({
+      ...common,
+      fetcher: vi.fn().mockResolvedValue(Response.json({ access_token: 42 }))
+    });
+    await expect(responseFailure).rejects.toMatchObject({
+      name: "GoogleClassroomSourceError",
+      code: "GOOGLE_TOKEN_RESPONSE_INVALID",
+      message: "Google returned an invalid token response."
+    });
+  });
+
+  it("rejects token redirects without forwarding confidential request fields", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, {
+      status: 302,
+      headers: { location: "https://attacker.example/token" }
+    }));
+    const failure = exchangeGoogleAuthorizationCode({
+      code: "authorization-code",
+      clientId: "client.apps.googleusercontent.com",
+      clientSecret: "client-secret",
+      redirectUri: "https://homeroom.example/api/integrations/google/callback",
+      fetcher
+    });
+
+    await expect(failure).rejects.toMatchObject({
+      name: "GoogleClassroomSourceError",
+      code: "GOOGLE_TOKEN_REJECTED"
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });

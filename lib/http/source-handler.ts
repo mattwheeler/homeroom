@@ -12,6 +12,7 @@ import type { RateLimiter } from "../security/rate-limit";
 import { SessionTokenError, verifySessionToken } from "../security/session-token";
 import type { SessionRecord, SessionStore } from "../storage/session-store";
 import type { SourceSnapshot } from "../storage/source-connection-store";
+import { googleOAuthIntentCookie } from "./google-oauth-flow";
 
 const emptySchema = z.object({}).strict();
 const bandSchema = z.object({
@@ -70,21 +71,21 @@ function json(body: unknown, status: number, headers?: Record<string, string>): 
 }
 
 function oauthCookie(token: string, secure: boolean, maxAgeSeconds: number): string {
-  const parts = [
-    `homeroom_oauth_session=${encodeURIComponent(token)}`,
-    "HttpOnly",
-    "SameSite=Lax",
-    "Path=/api/integrations/google/callback",
-    `Max-Age=${Math.max(0, Math.floor(maxAgeSeconds))}`
-  ];
-  if (secure) parts.push("Secure");
-  return parts.join("; ");
+  return googleOAuthIntentCookie({
+    name: "homeroom_oauth_session",
+    value: token,
+    secure,
+    maxAge: maxAgeSeconds
+  });
 }
 
-async function authenticateStudent(
+type SourcePermission = "read" | "manage";
+
+async function authenticateSourceActor(
   request: Request,
   dependencies: Pick<BaseDependencies, "store" | "signingSecret" | "now">,
-  cookieName: "homeroom_session" | "homeroom_oauth_session"
+  cookieName: "homeroom_session" | "homeroom_oauth_session",
+  permission: SourcePermission
 ): Promise<{ session: SessionRecord; sessionToken: string }> {
   const sessionToken = readCookie(request, cookieName);
   if (!sessionToken) {
@@ -92,17 +93,21 @@ async function authenticateStudent(
   }
   const now = (dependencies.now ?? (() => new Date()))();
   const payload = await verifySessionToken(sessionToken, dependencies.signingSecret, now.getTime());
-  if (payload.role !== "student") {
+  if (permission === "manage" && payload.role !== "guardian") {
     throw new SourceConnectionError(
       "SOURCE_SCOPE_MISMATCH",
-      "Source connections belong to the student workspace."
+      "Only Emily's guardian can manage source connections."
     );
   }
   const session = await dependencies.store.findById(payload.sessionId);
+  const expectedActorId = payload.role === "guardian" ? "guardian_matt" : "student_emily";
+  const identityMatches = session?.principalId
+    ? session.actorId === session.principalId
+    : session?.actorId === expectedActorId;
   if (
     !session ||
-    session.role !== "student" ||
-    session.actorId !== "student_emily" ||
+    session.role !== payload.role ||
+    !identityMatches ||
     Date.parse(session.expiresAt) < now.getTime()
   ) {
     throw new SessionTokenError("SESSION_EXPIRED", "The Homeroom session is no longer active.");
@@ -110,15 +115,16 @@ async function authenticateStudent(
   return { session, sessionToken };
 }
 
-async function readStudentJson<T>(input: {
+async function readSourceJson<T>(input: {
   request: Request;
   dependencies: BaseDependencies;
   schema: z.ZodType<T>;
+  permission: SourcePermission;
 }): Promise<AuthenticatedRequest<T> | Response> {
   try {
     assertSameOrigin(input.request);
     assertJsonRequest(input.request);
-    if (!input.dependencies.rateLimiter.consume(input.dependencies.clientKey)) {
+    if (!(await input.dependencies.rateLimiter.consume(input.dependencies.clientKey))) {
       return json(
         { error: { code: "RATE_LIMITED", message: "Take a short pause before trying again." } },
         429,
@@ -136,7 +142,12 @@ async function readStudentJson<T>(input: {
       return json({ error: { code: "INVALID_REQUEST", message: "Invalid source request." } }, 400);
     }
     const body = input.schema.parse(raw);
-    const authenticated = await authenticateStudent(input.request, input.dependencies, "homeroom_session");
+    const authenticated = await authenticateSourceActor(
+      input.request,
+      input.dependencies,
+      "homeroom_session",
+      input.permission
+    );
     const csrf = input.request.headers.get("x-homeroom-csrf") ?? "";
     if (csrf.length > 256 || !(await verifyCsrfToken(csrf, authenticated.session.csrfHash))) {
       return json({ error: { code: "REQUEST_REJECTED", message: "The request could not be verified." } }, 403);
@@ -175,19 +186,28 @@ async function runSource<T>(run: () => Promise<T>): Promise<Response> {
 }
 
 export async function handleSourceStatus(request: Request, dependencies: SourceStatusDependencies) {
-  const authenticated = await readStudentJson({ request, dependencies, schema: emptySchema });
+  const authenticated = await readSourceJson({ request, dependencies, schema: emptySchema, permission: "read" });
   if (authenticated instanceof Response) return authenticated;
   return runSource(() => dependencies.snapshot(authenticated.session));
 }
 
 export async function handleGoogleClassroomStart(request: Request, dependencies: GoogleStartDependencies) {
-  const authenticated = await readStudentJson({ request, dependencies, schema: emptySchema });
+  const authenticated = await readSourceJson({ request, dependencies, schema: emptySchema, permission: "manage" });
   if (authenticated instanceof Response) return authenticated;
   const response = await runSource(() => dependencies.start(authenticated.session));
   if (response.ok) {
-    response.headers.set(
+    response.headers.append(
       "set-cookie",
       oauthCookie(authenticated.sessionToken, new URL(request.url).protocol === "https:", 10 * 60)
+    );
+    response.headers.append(
+      "set-cookie",
+      googleOAuthIntentCookie({
+        name: "homeroom_auth_intent",
+        value: "",
+        secure: new URL(request.url).protocol === "https:",
+        maxAge: 0
+      })
     );
   }
   return response;
@@ -197,19 +217,19 @@ export async function handleBandCalendarConnection(
   request: Request,
   dependencies: BandConnectionDependencies
 ) {
-  const authenticated = await readStudentJson({ request, dependencies, schema: bandSchema });
+  const authenticated = await readSourceJson({ request, dependencies, schema: bandSchema, permission: "manage" });
   if (authenticated instanceof Response) return authenticated;
   return runSource(() => dependencies.connect(authenticated.session, authenticated.body));
 }
 
 export async function handleSourceSync(request: Request, dependencies: SourceSyncDependencies) {
-  const authenticated = await readStudentJson({ request, dependencies, schema: syncSchema });
+  const authenticated = await readSourceJson({ request, dependencies, schema: syncSchema, permission: "manage" });
   if (authenticated instanceof Response) return authenticated;
   return runSource(() => dependencies.sync(authenticated.session, authenticated.body));
 }
 
 function callbackRedirect(request: Request, result: string, clearCookie = true): Response {
-  const location = new URL(`/?source=${result}#sources`, new URL(request.url).origin);
+  const location = new URL(`/guardian?source=${result}#school-sources`, new URL(request.url).origin);
   const headers = new Headers({ location: location.toString(), "cache-control": "no-store" });
   if (clearCookie) {
     headers.set(
@@ -218,6 +238,34 @@ function callbackRedirect(request: Request, result: string, clearCookie = true):
     );
   }
   return new Response(null, { status: 303, headers });
+}
+
+function callbackFailureResult(error: unknown): string {
+  if (!(error instanceof SourceConnectionError)) return "google-error";
+  switch (error.code) {
+    case "SOURCE_OAUTH_EXCHANGE_FAILED":
+      return "google-oauth-error";
+    case "SOURCE_OAUTH_INVALID_GRANT":
+      return "google-invalid-grant";
+    case "SOURCE_OAUTH_INVALID_CLIENT":
+      return "google-client-error";
+    case "SOURCE_OAUTH_TOKEN_REJECTED":
+      return "google-token-rejected";
+    case "SOURCE_OAUTH_NETWORK_FAILED":
+      return "google-network-error";
+    case "SOURCE_OAUTH_RESPONSE_INVALID":
+      return "google-response-error";
+    case "SOURCE_OAUTH_PROVIDER_UNAVAILABLE":
+      return "google-provider-unavailable";
+    case "SOURCE_CLASSROOM_READ_FAILED":
+      return "google-classroom-error";
+    case "SOURCE_CONNECTION_SAVE_FAILED":
+      return "google-storage-error";
+    case "SOURCE_REFRESH_MISSING":
+      return "google-refresh-error";
+    default:
+      return "google-error";
+  }
 }
 
 export async function handleGoogleClassroomCallback(
@@ -232,14 +280,15 @@ export async function handleGoogleClassroomCallback(
     return callbackRedirect(request, "google-error");
   }
   try {
-    const { session } = await authenticateStudent(
+    const { session } = await authenticateSourceActor(
       request,
       dependencies,
-      "homeroom_oauth_session"
+      "homeroom_oauth_session",
+      "manage"
     );
     await dependencies.complete(session, { state, code });
     return callbackRedirect(request, "google-connected");
-  } catch {
-    return callbackRedirect(request, "google-error");
+  } catch (error) {
+    return callbackRedirect(request, callbackFailureResult(error));
   }
 }

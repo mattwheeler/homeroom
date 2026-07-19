@@ -54,4 +54,45 @@ describe("D1 foundation migration", () => {
     expect(sql).not.toContain("calendar_url TEXT");
     expect(sql).not.toMatch(/SELECT.+\$\{/s);
   });
+
+  it("adds attributed district calendar and source-backed supply records", async () => {
+    const sql = await readFile(new URL("../migrations/0007_official_school_sources.sql", import.meta.url), "utf8");
+    for (const table of [
+      "school_source_connections",
+      "school_calendar_events",
+      "school_supply_lists",
+      "school_supply_items"
+    ]) {
+      expect(sql).toContain("CREATE TABLE " + table);
+    }
+    expect(sql).toContain("source_url TEXT NOT NULL");
+    expect(sql).toContain("source_ordinal INTEGER NOT NULL");
+    expect(sql).not.toContain("generated_item");
+    expect(sql).not.toMatch(/SELECT.+\$\{/s);
+  });
+
+  it("binds product sessions to a verified external identity", async () => {
+    const sql = await readFile(new URL("../migrations/0008_verified_identity.sql", import.meta.url), "utf8");
+    expect(sql).toContain("identity_provider");
+    expect(sql).toContain("identity_subject");
+    expect(sql).toContain("identity_email");
+    expect(sql).toContain("demo_sessions_identity_idx");
+  });
+
+  it("adds real principals, households, focus history, durable limits, and supply semantics", async () => {
+    const sql = await readFile(new URL("../migrations/0009_product_loops.sql", import.meta.url), "utf8");
+    for (const table of [
+      "principals",
+      "households",
+      "household_members",
+      "focus_blocks",
+      "rate_limit_windows",
+      "guardian_digest_deliveries",
+      "live_day_plan_versions"
+    ]) expect(sql).toContain("CREATE TABLE " + table);
+    expect(sql).toContain("ADD COLUMN principal_id");
+    expect(sql).toContain("ADD COLUMN household_id");
+    expect(sql).toContain("ADD COLUMN student_id");
+    expect(sql).toContain("ADD COLUMN item_kind");
+  });
 });

@@ -16,7 +16,13 @@ function base64UrlEncode(bytes: Uint8Array): string {
 function base64UrlDecode(value: string): Uint8Array {
   const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
   try {
-    return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
+    const decoded = Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
+    // Reject alternate encodings whose unused trailing bits decode to the same
+    // bytes. This makes envelope text canonical and tamper tests deterministic.
+    if (base64UrlEncode(decoded) !== value) {
+      throw new SourceSecretError("The source secret envelope is invalid.");
+    }
+    return decoded;
   } catch {
     throw new SourceSecretError("The source secret envelope is invalid.");
   }

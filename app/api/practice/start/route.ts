@@ -4,12 +4,12 @@ import { generatePracticeHint } from "../../../../lib/ai/practice-hint";
 import { createOpenAIResponsesClient } from "../../../../lib/ai/openai-client";
 import { startPracticeSession } from "../../../../lib/domain/practice";
 import { handleStartPractice } from "../../../../lib/http/practice-handler";
-import { FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
+import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
 import { D1AiTurnStore } from "../../../../lib/storage/ai-turn-store";
 import { D1PracticeStore } from "../../../../lib/storage/practice-store";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
 
-const limiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 60_000 });
+const limiter = new D1FixedWindowRateLimiter(env.HOMEROOM_DB, { limit: 4, windowMs: 60_000, namespace: "practice-start" });
 
 export async function POST(request: Request) {
   if (!env.SESSION_SIGNING_SECRET || env.SESSION_SIGNING_SECRET.length < 32 || !env.OPENAI_API_KEY) {

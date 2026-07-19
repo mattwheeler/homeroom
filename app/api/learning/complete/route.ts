@@ -5,11 +5,11 @@ import {
   LearningSessionError
 } from "../../../../lib/domain/learning-session";
 import { handleCompleteLearning } from "../../../../lib/http/learning-handler";
-import { FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
+import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
 import { D1LearningStore } from "../../../../lib/storage/learning-store";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
 
-const limiter = new FixedWindowRateLimiter({ limit: 8, windowMs: 60_000 });
+const limiter = new D1FixedWindowRateLimiter(env.HOMEROOM_DB, { limit: 8, windowMs: 60_000, namespace: "learning-complete" });
 
 export async function POST(request: Request) {
   if (!env.SESSION_SIGNING_SECRET || env.SESSION_SIGNING_SECRET.length < 32) {

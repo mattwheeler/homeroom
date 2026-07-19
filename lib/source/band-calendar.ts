@@ -23,9 +23,10 @@ export class BandCalendarSourceError extends Error {
   }
 }
 
-function approvedBandHost(hostname: string): boolean {
+function approvedCalendarHost(hostname: string): boolean {
   const value = hostname.toLowerCase();
-  return value === "band.us" || value.endsWith(".band.us");
+  return value === "band.us" || value.endsWith(".band.us") ||
+    value === "gocuttime.com" || value.endsWith(".gocuttime.com");
 }
 
 export function normalizeCalendarFeedUrl(value: string, base?: string): string {
@@ -34,12 +35,12 @@ export function normalizeCalendarFeedUrl(value: string, base?: string): string {
   try {
     url = base ? new URL(webcal, base) : new URL(webcal);
   } catch {
-    throw new BandCalendarSourceError("Enter a valid BAND calendar URL.");
+    throw new BandCalendarSourceError("Enter a valid CutTime or BAND calendar URL.");
   }
-  if (url.protocol !== "https:") throw new BandCalendarSourceError("BAND calendar feeds must use HTTPS.");
+  if (url.protocol !== "https:") throw new BandCalendarSourceError("Calendar feeds must use HTTPS.");
   if (url.username || url.password) throw new BandCalendarSourceError("Calendar URLs cannot contain credentials.");
-  if ((url.port && url.port !== "443") || !approvedBandHost(url.hostname)) {
-    throw new BandCalendarSourceError("The calendar URL is not from an approved BAND host.");
+  if ((url.port && url.port !== "443") || !approvedCalendarHost(url.hostname)) {
+    throw new BandCalendarSourceError("The calendar URL is not from an approved CutTime or BAND host.");
   }
   url.hash = "";
   return url.toString();
@@ -58,17 +59,17 @@ function dateValue(time: ICAL.Time | null | undefined): string | null {
 
 function parseCalendar(text: string): BandCalendarEvent[] {
   if (!text.includes("BEGIN:VCALENDAR")) {
-    throw new BandCalendarSourceError("The BAND source did not return an iCalendar feed.");
+    throw new BandCalendarSourceError("The calendar source did not return an iCalendar feed.");
   }
   try {
     const component = new ICAL.Component(ICAL.parse(text));
-    const events = component.getAllSubcomponents("vevent").slice(0, 500).map((item) => {
+    const events = component.getAllSubcomponents("vevent").map((item) => {
       const event = new ICAL.Event(item);
       const uid = bounded(event.uid, 512);
       const title = bounded(event.summary, 1_000);
       const startsAt = dateValue(event.startDate);
       if (!uid || !title || !startsAt) {
-        throw new BandCalendarSourceError("A BAND calendar event is missing required fields.");
+        throw new BandCalendarSourceError("A calendar event is missing required fields.");
       }
       const lastModifiedValue = item.getFirstPropertyValue("last-modified");
       const lastModified = lastModifiedValue instanceof ICAL.Time ? lastModifiedValue : null;
@@ -85,10 +86,12 @@ function parseCalendar(text: string): BandCalendarEvent[] {
         sourceUpdatedAt: dateValue(lastModified)
       };
     });
-    return events.sort((left, right) => left.startsAt.localeCompare(right.startsAt));
+    return events
+      .sort((left, right) => left.startsAt.localeCompare(right.startsAt))
+      .slice(-500);
   } catch (error) {
     if (error instanceof BandCalendarSourceError) throw error;
-    throw new BandCalendarSourceError("The BAND iCalendar feed could not be parsed.");
+    throw new BandCalendarSourceError("The iCalendar feed could not be parsed.");
   }
 }
 
@@ -114,14 +117,14 @@ export class BandCalendarAdapter {
       });
       if (REDIRECT_STATUSES.has(response.status)) {
         const location = response.headers.get("location");
-        if (!location) throw new BandCalendarSourceError("The BAND calendar redirect is invalid.");
+        if (!location) throw new BandCalendarSourceError("The calendar redirect is invalid.");
         current = normalizeCalendarFeedUrl(location, current);
         continue;
       }
-      if (!response.ok) throw new BandCalendarSourceError("The BAND calendar could not be read.");
+      if (!response.ok) throw new BandCalendarSourceError("The calendar could not be read.");
       const declared = Number(response.headers.get("content-length") ?? 0);
       if (Number.isFinite(declared) && declared > MAX_CALENDAR_BYTES) {
-        throw new BandCalendarSourceError("The BAND calendar feed is too large.");
+        throw new BandCalendarSourceError("The calendar feed is too large.");
       }
       const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
       if (
@@ -130,13 +133,13 @@ export class BandCalendarAdapter {
         !contentType.includes("text/plain") &&
         !contentType.includes("application/octet-stream")
       ) {
-        throw new BandCalendarSourceError("The BAND source did not return calendar content.");
+        throw new BandCalendarSourceError("The source did not return calendar content.");
       }
       const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength > MAX_CALENDAR_BYTES) throw new BandCalendarSourceError("The BAND calendar feed is too large.");
+      if (bytes.byteLength > MAX_CALENDAR_BYTES) throw new BandCalendarSourceError("The calendar feed is too large.");
       return new TextDecoder().decode(bytes);
     }
-    throw new BandCalendarSourceError("The BAND calendar redirected too many times.");
+    throw new BandCalendarSourceError("The calendar redirected too many times.");
   }
 
   async sync(sourceUrl: string): Promise<{

@@ -81,7 +81,7 @@ async function handleLearningRequest<T>(input: {
   try {
     assertSameOrigin(input.request);
     assertJsonRequest(input.request);
-    if (!input.dependencies.rateLimiter.consume(input.dependencies.clientKey)) {
+    if (!(await input.dependencies.rateLimiter.consume(input.dependencies.clientKey))) {
       return json(
         { error: { code: "RATE_LIMITED", message: "Take a short pause before continuing." } },
         429,
@@ -115,10 +115,12 @@ async function handleLearningRequest<T>(input: {
     if (
       !session ||
       session.role !== "student" ||
-      session.actorId !== "student_emily" ||
       Date.parse(session.expiresAt) < now.getTime()
     ) {
       return json({ error: { code: "AUTH_REQUIRED", message: "Start a new Homeroom session." } }, 401);
+    }
+    if (!(await input.dependencies.rateLimiter.consume(`${input.dependencies.clientKey}:session:${session.id}`))) {
+      return json({ error: { code: "RATE_LIMITED", message: "Take a short pause before continuing." } }, 429, { "retry-after": "30" });
     }
     const csrf = input.request.headers.get("x-homeroom-csrf") ?? "";
     if (csrf.length > 256 || !(await verifyCsrfToken(csrf, session.csrfHash))) {

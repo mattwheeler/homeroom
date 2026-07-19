@@ -16,6 +16,7 @@ const csrfToken = "csrf-family-reminder";
 const expiresAt = Date.parse("2026-07-18T14:00:00.000Z");
 const allow: RateLimiter = { consume: () => true };
 const now = () => new Date("2026-07-18T12:13:00.000Z");
+const previewBody = JSON.stringify({ taskId: "google_classroom:coursework:physical_form" });
 
 function session(role: "student" | "guardian" = "student"): SessionRecord {
   return {
@@ -70,7 +71,7 @@ describe("Family reminder HTTP handlers", () => {
     });
     const record = session();
     const response = await handlePreviewFamilyReminder(
-      await request("/api/family/reminder/preview", "{}"),
+      await request("/api/family/reminder/preview", previewBody),
       {
         store: new MemorySessionStore(record),
         signingSecret,
@@ -87,7 +88,7 @@ describe("Family reminder HTTP handlers", () => {
       preview: { title: "Band physical form needs your help" },
       proof: { independentTrack: "family", stateUnchanged: true }
     });
-    expect(preview).toHaveBeenCalledWith(record);
+    expect(preview).toHaveBeenCalledWith(record, { taskId: "google_classroom:coursework:physical_form" });
   });
 
   it("sends only the staged action ID and one-time receipt", async () => {
@@ -122,22 +123,22 @@ describe("Family reminder HTTP handlers", () => {
     const base = { signingSecret, rateLimiter: allow, clientKey: "test", now, preview };
 
     await expect(handlePreviewFamilyReminder(
-      await request("/api/family/reminder/preview", "{}", { includeCookie: false }),
+      await request("/api/family/reminder/preview", previewBody, { includeCookie: false }),
       { ...base, store: new MemorySessionStore(session()) }
     )).resolves.toMatchObject({ status: 401 });
 
     await expect(handlePreviewFamilyReminder(
-      await request("/api/family/reminder/preview", "{}", { role: "guardian" }),
+      await request("/api/family/reminder/preview", previewBody, { role: "guardian" }),
       { ...base, store: new MemorySessionStore(session("guardian")) }
     )).resolves.toMatchObject({ status: 403 });
 
     await expect(handlePreviewFamilyReminder(
-      await request("/api/family/reminder/preview", "{}", { origin: "https://attacker.example" }),
+      await request("/api/family/reminder/preview", previewBody, { origin: "https://attacker.example" }),
       { ...base, store: new MemorySessionStore(session()) }
     )).resolves.toMatchObject({ status: 403 });
 
     await expect(handlePreviewFamilyReminder(
-      await request("/api/family/reminder/preview", "{}", { csrf: "wrong" }),
+      await request("/api/family/reminder/preview", previewBody, { csrf: "wrong" }),
       { ...base, store: new MemorySessionStore(session()) }
     )).resolves.toMatchObject({ status: 403 });
 
@@ -147,7 +148,7 @@ describe("Family reminder HTTP handlers", () => {
     )).resolves.toMatchObject({ status: 400 });
 
     await expect(handlePreviewFamilyReminder(
-      await request("/api/family/reminder/preview", "{}"),
+      await request("/api/family/reminder/preview", previewBody),
       { ...base, store: new MemorySessionStore(session()), rateLimiter: { consume: () => false } }
     )).resolves.toMatchObject({ status: 429 });
 
@@ -213,18 +214,18 @@ describe("Family reminder HTTP handlers", () => {
       .resolves.toMatchObject({ status: 413 });
 
     await expect(handlePreviewFamilyReminder(
-      await request("/api/family/reminder/preview", "{}", { cookie: "not-a-session-token" }),
+      await request("/api/family/reminder/preview", previewBody, { cookie: "not-a-session-token" }),
       dependencies
     )).resolves.toMatchObject({ status: 401 });
 
     await expect(handlePreviewFamilyReminder(
-      await request("/api/family/reminder/preview", "{}"),
+      await request("/api/family/reminder/preview", previewBody),
       { ...dependencies, store: new MemorySessionStore(null) }
     )).resolves.toMatchObject({ status: 401 });
 
     const expiredRecord = { ...session(), expiresAt: "2026-07-18T12:00:00.000Z" };
     await expect(handlePreviewFamilyReminder(
-      await request("/api/family/reminder/preview", "{}"),
+      await request("/api/family/reminder/preview", previewBody),
       { ...dependencies, store: new MemorySessionStore(expiredRecord) }
     )).resolves.toMatchObject({ status: 401 });
 

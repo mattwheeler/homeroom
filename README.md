@@ -4,32 +4,29 @@ Homeroom is a guardian-connected AI workspace designed specifically for K–12 s
 
 The product thesis is simple: students should not have to translate a pile of school portals, calendars, assignments, and family logistics into a workable day by themselves. Homeroom turns approved source records into a calm, age-appropriate plan while keeping consequential actions explicit, reviewable, and reversible.
 
-## Golden experience
+## Product surfaces
 
-The demo is a single rehearsable contract:
+- `/student` is Emily's complete student workspace. **Today** presents one actionable next task, **Calendar** combines schoolwork, band events, and official district dates, **Classes** shows all seven connected Classroom classes, **Supplies** shows only attributed school-list lines, and **Learn** opens independent AI-led Learning rooms. AI planning, source-change review, family help, guardian-safe sharing, and transparency evidence are progressively disclosed inside this journey. Guardian controls and source credentials never appear here.
+- `/guardian` is Matt's separate guardian workspace for Emily's age/grade profile, learning supports, safety and privacy controls, and read-only source connections—including Google Classroom, band calendars, the official district calendar, and official school/course supply pages.
+- `/` is a role-aware account entry screen. Student and guardian accounts authenticate separately with their allowlisted Google identities before opening their workspace. There is no separate demo product or demo-only route.
 
-1. Emily starts a private student session.
-2. Homeroom reads seven fictional Google Classroom-style course records and a BAND calendar event.
-3. Emily reviews and approves a personalized band-camp morning plan.
-4. A controlled calendar change moves check-in from 7:30 AM to 7:15 AM.
-5. Homeroom explains the source change and asks before saving plan version two.
-6. Emily practices one algebra problem with hints instead of answer dumping.
-7. Emily previews exactly what Matt can see, then explicitly publishes the guardian-safe summary.
-8. The proof view exposes source, approval, version, and model traces for judges.
+## Live product experience
 
-All names and school records in the repository are fictional fixtures. No real student data is required for the submission demo.
+Homeroom has no separate demo application and no forced judge sequence. The production student and guardian journeys are the Build Week experience:
 
-### Demo sequence versus product navigation
+1. A verified Google identity resolves to a durable student or guardian principal and household membership.
+2. Guardian-managed, read-only sources populate the live projection: Google Classroom, CutTime/BAND calendar exports, official district dates, and official school supply pages.
+3. **Today** recommends one next action, but Emily can always choose a different task, class, Learning Room, calendar date, or family-help request.
+4. **Plan today** runs GPT‑5.6 Sol against the current live projection. Emily can accept the exact proposal, request an alternative, or ignore it. Every saved version is bound to the source fingerprint and a one-time approval receipt.
+5. **Task Room** persists the selected timebox, completed chunks, elapsed time, and estimate-versus-actual evidence. A shame-free re-entry card uses that history after time away without streak pressure.
+6. **Ask Matt** shows Emily the exact notification first. Only her approved message enters Matt's guardian inbox, where it can be acknowledged and included in an approved-only weekly email digest.
+7. **Learn** opens any connected class immediately; tutoring, planning, schoolwork, and family help are independent capabilities rather than prerequisites for one another.
 
-The numbered Golden Experience is a deterministic judge script, not the intended navigation model for Homeroom. Its linear state machine makes every source change, approval, model turn, and write reproducible in a short demo and prevents stale or out-of-order evidence from weakening the final proof.
-
-In the product, planning, learning, and guardian tasks are separate tracks. Emily should be able to open Algebra without first saving a morning plan, and a physical-form reminder should be available without completing tutoring. Only a genuinely derived action stays dependent—for example, a guardian summary cannot claim that practice is complete until practice is actually complete. The Golden path stays narrow for reliability while product capabilities move to independent state and storage with the same approval and audit guarantees.
-
-The first independent product track is live. Immediately after starting a session, Emily can select **Ask Matt**, review the exact notification that will be delivered, and explicitly approve it. Homeroom persists that notification to Matt's guardian inbox, consumes the one-time approval, and writes a dedicated audit event without changing the Golden state or requiring a plan or tutoring result. The later progress summary remains a separate, optional action because it contains facts derived from completed practice.
+The included Classroom sandbox records are fictional and safe for a submission walkthrough. The same product paths also operate on authenticated live source data; source writes, submissions, grade changes, and calendar edits are never requested.
 
 ### Operational Learning continuity
 
-Learning is now a second independent product track, not a one-question extension of the Golden demo. Emily can open any of her seven upcoming classes immediately after starting her day:
+Emily can open any of her seven upcoming classes immediately after signing in:
 
 - English I — claims and evidence;
 - Algebra I — preserving equality;
@@ -47,43 +44,41 @@ Emily chooses a 10, 15, or 20 minute timebox and an explicit support preference 
 
 Homeroom owns learner continuity as transparent structured data. During an active session, only the last eight dialogue entries are retained for bounded coaching context. Completion atomically clears that dialogue, saves a recap, updates evidence-backed course progress, and stores only the support preference Emily explicitly selected. That memory is course-scoped, expires after 90 days, is visible in **What Homeroom remembers**, and can be deleted by Emily with an audit event. Homeroom does not persist diagnoses, intelligence labels, model-inferred personality, raw completed dialogue, or unsupported mastery claims.
 
-Every Learning model call uses `gpt-5.6-sol`, one strict read-only `get_learning_session_context` tool, and `store: false`. Homeroom sends a fresh, application-built context on every turn instead of relying on provider-side conversation memory or `previous_response_id`. Learning sessions, learner signals, objective progress, and memory events have dedicated D1 tables and do not mutate the Golden plan state or Family reminder state.
+Every Learning model call uses `gpt-5.6-sol`, one strict read-only `get_learning_session_context` tool, and `store: false`. Homeroom sends a fresh, application-built context on every turn instead of relying on provider-side conversation memory or `previous_response_id`. Learning sessions, learner signals, objective progress, and memory events have dedicated D1 tables and do not mutate planning, task, or family-reminder state.
 
 ## Technical foundation
 
 - Next.js 16 application surface running on Vinext and Cloudflare Workers
-- Cloudflare D1 for authoritative, versioned demo-session state
+- Cloudflare D1 for authoritative, versioned product-session state
 - OpenAI Responses API targeting `gpt-5.6-sol`
 - Strict, stage-scoped function tools with application-side validation
 - Explicit approval receipts bound to actor, arguments, expected versions, expiry, and idempotency key
 - Signed, role-scoped, `HttpOnly` session cookies plus same-origin and CSRF controls
+- Google OpenID Connect with PKCE, nonce, signed one-time intent cookies, verified email, and exact role allowlists
 - A persisted guardian inbox for independently approved family reminders
+- An approved-only guardian email digest delivered by the scheduled Worker
+- Durable, per-principal household identity instead of a global Emily/Matt actor mapping
+- D1-backed rate limiting for public and OpenAI-spending endpoints
+- Persisted focus blocks and shame-free student re-entry
 - Seven independent, timeboxed Learning tracks with application-managed learner continuity
-- Adapter boundaries for Google Classroom and BAND/iCalendar sources
+- Adapter boundaries for Google Classroom, BAND/iCalendar, official Comal ISD calendar records, and official school supply pages
 
 The AI loop uses low reasoning effort, low verbosity, `store: false`, a four-round tool ceiling, and preserves complete response output items and tool call IDs across continuations. The model can propose and explain; the application remains authoritative for permissions, state transitions, source diffs, math grading, and writes.
 
-## Live Golden Experience
+## How Codex and GPT‑5.6 were used
 
-The Golden Experience through guardian publishing is live end to end. After Emily starts a signed demo session, **Build my morning plan** calls `gpt-5.6-sol` through the OpenAI Responses API. The model must use one strict, read-only `get_morning_plan_context` function before returning a structured proposal.
+Codex was the implementation partner across product specification, UI iteration, source-adapter debugging, migrations, security hardening, tests, and Build Week documentation. The repository preserves that work as normal reviewable source code and automated verification rather than hiding core behavior in prompts.
 
-The server—not the model—enforces the authenticated session, student role, same-origin and CSRF checks, fixture allowlist, source version, exact timeline values, and request limits. Each turn records the returned model name, OpenAI response IDs, tool call ID, latency, and token usage in D1 for the judge proof view. API requests use `store: false` and a hashed safety identifier; the OpenAI key never reaches the browser.
+GPT‑5.6 Sol powers bounded proposal and coaching tasks through the OpenAI Responses API:
 
-The proposal is staged in D1 with a short-lived approval challenge bound to Emily, the exact server-stored plan, and the expected state, source, and plan versions. The browser sends only the action ID and one-time receipt when Emily selects **Approve and save Plan V1**—it cannot submit replacement plan content. A verified approval atomically writes Plan V1, consumes the receipt, advances the authoritative session state, and adds an audit event. Exact retries within the receipt window return the original saved result without creating a second plan.
+- live day planning must first read the server-built, read-only source projection;
+- plan refreshes compare against the latest projection fingerprint and stage a new immutable version;
+- Learning Rooms receive course-scoped objectives, the student's explicit support preference, bounded recent dialogue, and evidence-backed continuity; and
+- Socratic practice can provide hints, while deterministic application code retains grading authority and rejects answer leakage.
 
-After Plan V1 is saved, **Check BAND for updates** advances the controlled calendar fixture from source V1 to V2 and records the sole validated difference: check-in moved from 7:30 AM to 7:15 AM. A second live Responses API turn must use the read-only `get_plan_revision_context` tool before explaining that change and proposing an exact 15-minute shift to the morning timeline. The application keeps Plan V1 active until Emily separately approves Plan V2.
+Every model request uses strict structured output, stage-scoped read-only tools, `store: false`, a hashed safety identifier, and application-side validation. The model cannot save a plan, send a family note, acknowledge an inbox item, mutate a school source, grade work, or authorize itself. Source reads, model generation, proposal staging, one-time approval, and persistence remain separate boundaries.
 
-Source sync, model generation, proposal staging, and approval are distinct boundaries. If generation fails after source V2 is committed, a retry resumes from `SOURCE_V2_SYNCED` without repeating the sync. Plan V2 approval is bound to the exact server-stored revision and source V2; the atomic D1 write activates Plan V2 while retaining Plan V1 as immutable history.
-
-Once Plan V2 is active, **Start Algebra refresher** opens a live, hint-led exercise for `3(x + 2) = 18`. GPT-5.6 Sol must use the read-only `get_practice_exercise` tool and return one structured Socratic prompt about inverse operations. The tool context deliberately excludes the intermediate equation and final answer, and application validation rejects any model output that reveals either one.
-
-Emily chooses the first transformation and enters the final value herself. Both responses are graded by deterministic Homeroom code—not by the model. The server reveals `x + 2 = 6` only after the first operation is verified, refuses out-of-order completion, keeps incorrect-answer responses answer-free, and advances the authoritative session only after the final value is correct. D1 stores the private practice result, validated steps, attempts, hint count, completion timestamp, and one audit event.
-
-After practice, **Preview for Matt** builds a deterministic, server-owned guardian projection from an explicit allowlist. The preview contains the band-camp schedule, saved Plan V2 times, the fact that one Algebra I refresher was completed, and Matt's physical-form task. It deliberately excludes Emily's answer, step-by-step work, attempt count, hint count, and private coaching. No model writes or summarizes the guardian view, and the browser cannot submit replacement projection content.
-
-Emily sees the exact guardian view and a visible **Not shared yet** boundary before any publish occurs. **Approve and share with Matt** sends only an action ID and one-time receipt. The server revalidates the stored projection and its SHA-256 hash, then atomically saves projection V1, consumes the approval, advances the session to `GUARDIAN_PUBLISHED`, and records `GUARDIAN_SUMMARY_PUBLISHED` audit evidence. The successful response returns that same stored view so Emily can confirm exactly what was shared.
-
-Finally, **Open judge proof** advances the demo to `COMPLETE` and assembles a privacy-safe evidence ledger from D1. It shows the six authoritative transitions, three completed GPT-5.6 Sol traces, allowlisted source manifest, approval/hash evidence, and an integrity hash. The query layer extracts only approved audit fields and model metadata; raw model output, answers, worked steps, attempt counts, and hint counts never enter the proof response. Reopening the completed proof is idempotent and does not add another state transition or audit event.
+The earlier deterministic Golden state machine is retained only as backend regression and audit evidence for approval receipts, versioning, privacy projections, and replay resistance. It is not exposed as a second product or required navigation path.
 
 ## Local setup
 
@@ -104,12 +99,19 @@ For live read-only sources, also set:
 SOURCE_TOKEN_ENCRYPTION_KEY=a-different-random-secret-at-least-32-characters
 GOOGLE_CLASSROOM_CLIENT_ID=your-google-oauth-web-client-id
 GOOGLE_CLASSROOM_CLIENT_SECRET=your-google-oauth-web-client-secret
-GOOGLE_CLASSROOM_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
+GOOGLE_IDENTITY_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+AUTH_GUARDIAN_EMAILS=guardian-google-account@example.com
+AUTH_STUDENT_EMAILS=student-google-account@example.com
+RESEND_API_KEY=your-resend-api-key
+GUARDIAN_DIGEST_FROM=Homeroom <updates@your-verified-domain.example>
+CRON_SECRET=another-random-secret-at-least-32-characters
 ```
 
-In Google Cloud, enable the Classroom API, configure the OAuth consent screen, add Emily's Google account as a test user while the app remains in testing, and register the exact redirect URI above on a **Web application** OAuth client. The application requests only `classroom.courses.readonly` and `classroom.coursework.me.readonly`.
+In Google Cloud, enable the Classroom API, configure the OAuth consent screen, add both linked accounts as test users while the app remains in testing, and register the exact redirect URI above on the same **Web application** OAuth client. Identity and Classroom authorization return through that single hardened callback, then are separated by mutually exclusive HttpOnly intent cookies. Classroom requests only `classroom.courses.readonly` and `classroom.coursework.me.readonly`; identity sign-in requests only `openid email profile`.
 
-For BAND, open the band's Calendar, choose **Manage Events → Export Band Calendars**, copy the private iCal subscription URL, and paste it into Homeroom's source panel. Treat that URL like a password. Homeroom encrypts it at rest and never returns it to the browser after connection.
+`AUTH_GUARDIAN_EMAILS` and `AUTH_STUDENT_EMAILS` are comma-separated exact allowlists. A verified Google identity is resolved to a durable principal and household membership; a student account cannot open the guardian workspace and vice versa. Product sessions have no hostname- or environment-based fixture bypass. `RESEND_API_KEY` and `GUARDIAN_DIGEST_FROM` enable the weekly guardian digest; the scheduled Worker call is authenticated with `CRON_SECRET`.
+
+For the Band of Warriors, paste the guardian-specific CutTime calendar subscription URL from CutTime's **Calendar Links** area into Homeroom's guardian source panel. Homeroom also accepts BAND's official calendar export URL when a program uses BAND for its calendar. Treat either subscription URL like a password: Homeroom encrypts it at rest and never returns it to the browser after connection.
 
 Useful checks:
 
@@ -125,9 +127,21 @@ npm run security
 
 ## Read-only school sources
 
-The source layer is operational and deliberately separate from the deterministic Golden fallback.
+The source layer is operational and feeds the same live projection used by Today, Calendar, Classes, Supplies, Task Room, and the AI day planner.
 
-Google Classroom uses the OAuth web-server flow with one-time hashed state, PKCE S256, an offline refresh token encrypted with AES-GCM, and a ten-minute callback-only session cookie. On connect or refresh, Homeroom:
+### Official district dates and supply lists
+
+The guardian workspace can connect Comal ISD's official calendar page and one or more official school/course supply-list pages. Homeroom stores attributed snapshots in D1 and exposes them to Emily without exposing source configuration controls:
+
+- district holidays, first/last school days, staff/student holidays, and published early-release dates appear in **Calendar** with a distinct **School** color and an official-source label;
+- grade-inapplicable dates are filtered—for example, an elementary-only early release is not presented as Emily's ninth-grade schedule;
+- every supply line retains the official page URL and source title;
+- missing quantities or missing items remain missing—Homeroom never asks a model to complete or infer a shopping list; and
+- student checkmarks are private organizational state and never alter the official page.
+
+The adapters accept only HTTPS Comal ISD/Pieper domains, reject credentials and nonstandard ports, manually revalidate redirects, enforce payload limits, and fail closed when the official publication is missing or changes shape. The initial verified sources are [Comal ISD calendars](https://www.comalisd.org/apps/pages/calendars) and Pieper High School's official course supply pages; guardians can add additional official Comal/Pieper supply pages without a code change.
+
+Google Classroom uses Google's OAuth web-server flow with one-time hashed state, a confidential server-side client, an offline refresh token encrypted with AES-GCM, and a ten-minute callback-only session cookie. On connect or refresh, Homeroom:
 
 1. lists Emily's active courses with `studentId=me`;
 2. reads only published coursework for each course;
@@ -136,9 +150,29 @@ Google Classroom uses the OAuth web-server flow with one-time hashed state, PKCE
 5. maps recognized course names to the seven Learning tracks with deterministic application rules; and
 6. returns only public class, coursework, event, connection-status, and last-sync fields to the browser.
 
-BAND's current Open API does not expose calendar events, so Homeroom uses BAND's official exported iCal subscription instead of scraping or pretending a calendar API exists. The fetcher accepts only HTTPS `band.us` hosts, rejects credentials and nonstandard ports, manually revalidates every redirect, limits payload and event counts, parses timed and all-day events, and stores the private feed URL only as encrypted ciphertext.
+The Band of Warriors source map keeps each real tool's job honest:
+
+- CutTime contributes the live guardian-specific calendar feed for rehearsals, performances, competitions, call times, and schedule changes.
+- The Weekly Sheet remains a linked, read-only source. The verified Drive folder currently contains archived seasons but no current-season sheet, so Homeroom shows a waiting state instead of inventing content.
+- BAND announcements require a reviewed BAND developer application and member authorization. Until those credentials exist, Homeroom links the official path and does not claim announcements are connected. BAND's calendar export remains a supported alternative calendar feed.
+- The Band of Warriors parent portal remains the verified hub for official family links and resources.
+
+The calendar fetcher accepts only HTTPS `band.us` or `gocuttime.com` hosts, rejects credentials and nonstandard ports, manually revalidates every redirect, limits payload size, keeps the 500 most recent events, parses timed and all-day events, and stores the private feed URL only as encrypted ciphertext.
 
 The current UI refreshes both sources on explicit student action and synchronizes immediately after connection. A production deployment can invoke the same idempotent sync service from a scheduled worker and refresh stale snapshots when the student opens Homeroom. Provider data remains read-only: Homeroom never posts, edits, submits, grades, or RSVPs. Plans, learner continuity, approvals, and guardian projections remain Homeroom-owned records.
+
+## Public deployment checklist
+
+Before exposing a persistent judge URL:
+
+1. apply every D1 migration, including `0009_product_loops.sql`, to the remote `homeroom-build-week` database;
+2. configure the production Google identity and Classroom callback URLs and exact student/guardian email allowlists;
+3. set `SESSION_SIGNING_SECRET`, `SOURCE_TOKEN_ENCRYPTION_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `GUARDIAN_DIGEST_FROM`, and `CRON_SECRET` as Worker secrets;
+4. verify the sending domain in Resend before enabling the weekly guardian digest;
+5. smoke-test student sign-in, guardian sign-in, source refresh, live-plan approval, Task Room completion, family-note delivery, inbox acknowledgement, and the scheduled digest against the deployed origin; and
+6. keep the D1-backed rate limiter and structured logging enabled on every public and model-spending endpoint.
+
+No remote migration, deployment, or outbound email is performed by the local setup commands.
 
 Official provider references:
 
@@ -147,6 +181,9 @@ Official provider references:
 - [Google Classroom coursework list](https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWork/list)
 - [Google Classroom student submissions list](https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWork.studentSubmissions/list)
 - [BAND calendar export instructions](https://help.mobilecore.naver.com/help/viewHelp.nhn?countryCode=EN&helpNo=1095&languageCode=en&serviceCode=band)
+- [CutTime guardian calendar subscription](https://support.gocuttime.com/article/298-subscribing-to-individual-calendar)
+- [BAND Open API guide](https://developers.band.us/develop/guide/api)
+- [Band of Warriors parent resources](https://www.pieperbandofwarriors.com/parent-resources)
 
 ## Project documents
 

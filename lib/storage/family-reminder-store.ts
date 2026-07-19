@@ -5,7 +5,7 @@ import type { D1DatabaseLike, D1RunResult } from "./session-store";
 export interface SentFamilyReminderResult {
   sent: true;
   notificationId: string;
-  recipient: "Matt";
+  recipient: string;
   channel: "Homeroom guardian inbox";
   sentAt: string;
   reminder: FamilyReminder;
@@ -35,7 +35,8 @@ export interface SentFamilyReminderWrite {
   reminder: FamilyReminder;
   pending: PendingAction;
   notificationId: string;
-  sentBy: "student_emily";
+  recipientId: string;
+  sentBy: string;
   sentAt: string;
   auditEventId: string;
 }
@@ -125,7 +126,7 @@ export class D1FamilyReminderStore implements FamilyReminderStore {
   async sendReminder(write: SentFamilyReminderWrite): Promise<SentFamilyReminderResult> {
     const batch = requireBatch(this.database);
     const result: SentFamilyReminderResult = {
-      sent: true, notificationId: write.notificationId, recipient: "Matt",
+      sent: true, notificationId: write.notificationId, recipient: write.reminder.recipient.name,
       channel: "Homeroom guardian inbox", sentAt: write.sentAt, reminder: write.reminder,
       proof: { approvalId: write.pending.id, argsHash: write.pending.argsHash, stateVersion: write.expectedStateVersion }
     };
@@ -143,7 +144,7 @@ export class D1FamilyReminderStore implements FamilyReminderStore {
         AND sessions.state_version = ? AND sessions.source_version = ?
         AND COALESCE(sessions.active_plan_version, 0) = ?`
     ).bind(
-      write.notificationId, "guardian_matt", "guardian_task_reminder", write.reminder.task.id,
+      write.notificationId, write.recipientId, "guardian_task_reminder", write.reminder.task.id,
       JSON.stringify(write.reminder), write.sentBy, write.sentAt,
       write.pending.id, write.sessionId, "SEND_GUARDIAN_TASK_REMINDER",
       write.pending.argsHash, write.pending.nonceHash, write.pending.idempotencyKey,
@@ -168,7 +169,7 @@ export class D1FamilyReminderStore implements FamilyReminderStore {
     ).bind(
       write.auditEventId, write.sentBy, "GUARDIAN_TASK_REMINDER_SENT",
       JSON.stringify([write.reminder.task.id]), write.expectedStateVersion,
-      JSON.stringify({ notificationId: write.notificationId, approvalId: write.pending.id, argsHash: write.pending.argsHash, recipient: "guardian_matt", track: "family" }),
+      JSON.stringify({ notificationId: write.notificationId, approvalId: write.pending.id, argsHash: write.pending.argsHash, recipient: write.recipientId, track: "family" }),
       write.sentAt, write.sessionId, write.expectedStateVersion, write.notificationId
     );
     const results = await batch([insertNotification, consume, audit]);

@@ -28,18 +28,35 @@ END:VEVENT\r
 END:VCALENDAR\r
 `;
 
-describe("read-only BAND iCalendar source adapter", () => {
-  it("accepts BAND's exported HTTPS or webcal subscription and rejects unsafe URLs", () => {
+describe("read-only band-program iCalendar source adapter", () => {
+  it("accepts CutTime and BAND exports while rejecting unsafe URLs", () => {
     expect(normalizeCalendarFeedUrl("webcal://calendar.band.us/export/private-token.ics"))
       .toBe("https://calendar.band.us/export/private-token.ics");
+    expect(normalizeCalendarFeedUrl("https://app.gocuttime.com/program/calendar/example-calendar-id/ics"))
+      .toBe("https://app.gocuttime.com/program/calendar/example-calendar-id/ics");
     expect(() => normalizeCalendarFeedUrl("http://calendar.band.us/feed.ics")).toThrow(/https/i);
     expect(() => normalizeCalendarFeedUrl("https://user:pass@calendar.band.us/feed.ics")).toThrow(/credentials/i);
     expect(() => normalizeCalendarFeedUrl("https://127.0.0.1/feed.ics")).toThrow(/approved/i);
     expect(() => normalizeCalendarFeedUrl("https://attacker.example/feed.ics")).toThrow(/approved/i);
+    expect(() => normalizeCalendarFeedUrl("https://gocuttime.com.attacker.example/feed.ics")).toThrow(/approved/i);
     expect(() => normalizeCalendarFeedUrl("https://calendar.band.us:8443/feed.ics")).toThrow(/approved/i);
     expect(() => normalizeCalendarFeedUrl("not a url")).toThrow(/valid/i);
     expect(normalizeCalendarFeedUrl("/next.ics#private", "https://calendar.band.us/export/start.ics"))
       .toBe("https://calendar.band.us/next.ics");
+  });
+
+  it("reads a CutTime calendar without exposing its private subscription URL", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(calendar, {
+      status: 200,
+      headers: { "content-type": "text/calendar" }
+    }));
+    const sourceUrl = "https://app.gocuttime.com/program/calendar/example-calendar-id/ics";
+
+    const result = await new BandCalendarAdapter({ fetcher }).sync(sourceUrl);
+
+    expect(fetcher).toHaveBeenCalledWith(sourceUrl, expect.objectContaining({ redirect: "manual" }));
+    expect(result).not.toHaveProperty("sourceUrl");
+    expect(result.events).toHaveLength(2);
   });
 
   it("fetches without forwarding credentials and normalizes bounded BAND events", async () => {
@@ -146,5 +163,24 @@ describe("read-only BAND iCalendar source adapter", () => {
     });
     await expect(notCalendar.sync("https://calendar.band.us/export/token.ics"))
       .rejects.toThrow(/iCalendar/i);
+  });
+
+  it("keeps the most recent 500 events when a long-running program calendar reaches the bound", async () => {
+    const events = Array.from({ length: 501 }, (_, index) => {
+      const date = new Date(Date.UTC(2026, 0, 1 + index)).toISOString().slice(0, 10).replaceAll("-", "");
+      return `BEGIN:VEVENT\r\nUID:event-${index}\r\nDTSTART;VALUE=DATE:${date}\r\nSUMMARY:Event ${index}\r\nEND:VEVENT`;
+    }).join("\r\n");
+    const longCalendar = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${events}\r\nEND:VCALENDAR\r\n`;
+    const adapter = new BandCalendarAdapter({
+      fetcher: vi.fn().mockResolvedValue(new Response(longCalendar, {
+        headers: { "content-type": "text/calendar" }
+      }))
+    });
+
+    const result = await adapter.sync("https://app.gocuttime.com/program/calendar/example/ics");
+
+    expect(result.events).toHaveLength(500);
+    expect(result.events.some((event) => event.uid === "event-0")).toBe(false);
+    expect(result.events.some((event) => event.uid === "event-500")).toBe(true);
   });
 });

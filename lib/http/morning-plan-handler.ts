@@ -10,6 +10,7 @@ import {
   verifyCsrfToken
 } from "../security/http";
 import type { SessionRecord, SessionStore } from "../storage/session-store";
+import type { Logger } from "../observability/logger";
 
 const emptyRequest = z.object({}).strict();
 
@@ -20,6 +21,7 @@ export interface MorningPlanHandlerDependencies {
   clientKey: string;
   generate(session: SessionRecord): Promise<unknown>;
   now?: () => Date;
+  logger?: Logger;
 }
 
 function json(body: unknown, status: number, headers?: Record<string, string>) {
@@ -36,7 +38,7 @@ export async function handleGenerateMorningPlan(
   try {
     assertSameOrigin(request);
     assertJsonRequest(request);
-    if (!dependencies.rateLimiter.consume(dependencies.clientKey)) {
+    if (!(await dependencies.rateLimiter.consume(dependencies.clientKey))) {
       return json(
         { error: { code: "RATE_LIMITED", message: "Please wait a moment before trying again." } },
         429,
@@ -66,10 +68,12 @@ export async function handleGenerateMorningPlan(
     if (
       !session ||
       session.role !== "student" ||
-      session.actorId !== "student_emily" ||
       Date.parse(session.expiresAt) < now.getTime()
     ) {
       return json({ error: { code: "AUTH_REQUIRED", message: "Start a new Homeroom session." } }, 401);
+    }
+    if (!(await dependencies.rateLimiter.consume(`${dependencies.clientKey}:session:${session.id}`))) {
+      return json({ error: { code: "RATE_LIMITED", message: "Please wait a moment before trying again." } }, 429, { "retry-after": "60" });
     }
     const csrfToken = request.headers.get("x-homeroom-csrf") ?? "";
     if (csrfToken.length > 256 || !(await verifyCsrfToken(csrfToken, session.csrfHash))) {
@@ -78,7 +82,8 @@ export async function handleGenerateMorningPlan(
 
     try {
       return json(await dependencies.generate(session), 200);
-    } catch {
+    } catch (error) {
+      dependencies.logger?.error("live_plan_generation_failed", error, { sessionId: session.id });
       return json(
         { error: { code: "PLAN_UNAVAILABLE", message: "I could not build the plan just yet. Please try again." } },
         502,
@@ -95,6 +100,7 @@ export async function handleGenerateMorningPlan(
     if (error instanceof z.ZodError) {
       return json({ error: { code: "INVALID_REQUEST", message: "Invalid morning-plan request." } }, 400);
     }
+    dependencies.logger?.error("morning_plan_request_failed", error, { clientKey: dependencies.clientKey });
     return json({ error: { code: "SERVICE_UNAVAILABLE", message: "The plan service is unavailable." } }, 500);
   }
 }

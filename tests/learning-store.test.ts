@@ -36,6 +36,16 @@ const initialTurn: LearningCoachTurn = {
   message: "Let’s start with one example.",
   question: "What do you notice?",
   encouragement: "This is a starting point, not a grade.",
+  executiveSkill: "organization",
+  nextAction: "Set up one example and identify what you notice.",
+  visualScaffold: {
+    kind: "sequence",
+    title: "Start with one example",
+    items: [
+      { label: "Look", detail: "Notice the two sides." },
+      { label: "Choose", detail: "Pick one next step." }
+    ]
+  },
   answerPolicy: "coach_not_complete"
 };
 

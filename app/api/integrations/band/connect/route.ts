@@ -2,11 +2,11 @@ import { env } from "cloudflare:workers";
 
 import { connectBandCalendar } from "../../../../../lib/domain/source-connections";
 import { handleBandCalendarConnection } from "../../../../../lib/http/source-handler";
-import { FixedWindowRateLimiter } from "../../../../../lib/security/rate-limit";
+import { D1FixedWindowRateLimiter } from "../../../../../lib/security/rate-limit";
 import { D1SessionStore } from "../../../../../lib/storage/session-store";
 import { D1SourceConnectionStore } from "../../../../../lib/storage/source-connection-store";
 
-const limiter = new FixedWindowRateLimiter({ limit: 5, windowMs: 60_000 });
+const limiter = new D1FixedWindowRateLimiter(env.HOMEROOM_DB, { limit: 5, windowMs: 60_000, namespace: "band-connect" });
 
 export async function POST(request: Request) {
   if (

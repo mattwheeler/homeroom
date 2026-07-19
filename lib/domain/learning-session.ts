@@ -13,7 +13,7 @@ export interface LearningDialogueEntry {
 export interface LearningSessionRecord {
   id: string;
   demoSessionId: string;
-  studentId: "student_emily";
+  studentId: string;
   courseId: CourseId;
   missionId: string;
   objectiveId: string;
@@ -31,7 +31,7 @@ export interface LearningSessionRecord {
 
 export interface LearnerSignal {
   id: string;
-  studentId: "student_emily";
+  studentId: string;
   scopeCourseId: CourseId;
   signalType: "support_preference";
   statement: string;
@@ -45,7 +45,7 @@ export interface LearnerSignal {
 }
 
 export interface LearningProgress {
-  studentId: "student_emily";
+  studentId: string;
   courseId: CourseId;
   objectiveId: string;
   status: "exploring" | "practicing";
@@ -86,7 +86,7 @@ export class LearningSessionError extends Error {
 }
 
 function assertStudentScope(session: SessionRecord): void {
-  if (session.role !== "student" || session.actorId !== "student_emily") {
+  if (session.role !== "student") {
     throw new LearningSessionError(
       "LEARNING_SCOPE_MISMATCH",
       "Learning belongs to Emily's student workspace."
@@ -150,7 +150,7 @@ export function createLearningSession(input: {
   const learningSession: LearningSessionRecord = {
     id: makeId("learning", input.randomUUID),
     demoSessionId: input.session.id,
-    studentId: "student_emily",
+    studentId: input.session.studentId ?? input.session.actorId,
     courseId: track.courseId,
     missionId: track.mission.id,
     objectiveId: track.mission.objectiveId,
@@ -167,7 +167,7 @@ export function createLearningSession(input: {
   };
   const learnerContext = input.existingSignals.filter(
     (signal) =>
-      signal.studentId === "student_emily" &&
+      signal.studentId === (input.session.studentId ?? input.session.actorId) &&
       signal.scopeCourseId === track.courseId &&
       signal.status === "active" &&
       Date.parse(signal.expiresAt) > now.getTime()
@@ -211,7 +211,7 @@ export function completeLearningSession(input: {
   };
   const signal: LearnerSignal = {
     id: makeId("signal", input.randomUUID),
-    studentId: "student_emily",
+    studentId: input.learningSession.studentId,
     scopeCourseId: track.courseId,
     signalType: "support_preference",
     statement: memoryStatement,
@@ -224,7 +224,7 @@ export function completeLearningSession(input: {
     expiresAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1_000).toISOString()
   };
   const progress: LearningProgress = {
-    studentId: "student_emily",
+    studentId: input.learningSession.studentId,
     courseId: track.courseId,
     objectiveId: track.mission.objectiveId,
     status: objectiveStatus,

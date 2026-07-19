@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   completeGoogleClassroomConnection,
   connectBandCalendar,
+  SourceConnectionError,
   startGoogleClassroomConnection,
   syncSourceConnection
 } from "../lib/domain/source-connections";
@@ -12,12 +13,13 @@ import type {
   SourceOAuthStateRecord,
   SourceProvider
 } from "../lib/storage/source-connection-store";
+import { GoogleClassroomSourceError } from "../lib/source/google-classroom";
 
 const session: SessionRecord = {
   id: "session_01",
   fixtureKey: "emily_band_camp_v1",
-  actorId: "student_emily",
-  role: "student",
+  actorId: "guardian_matt",
+  role: "guardian",
   state: { phase: "ORIENTATION_READY", stateVersion: 5, sourceVersion: 1, activePlanVersion: null },
   csrfHash: "hash",
   expiresAt: "2026-07-18T20:00:00.000Z",
@@ -52,7 +54,7 @@ class MemorySourceStore {
 const sourceSecret = "source-encryption-key-that-is-longer-than-thirty-two-characters";
 
 describe("read-only source connection orchestration", () => {
-  it("binds Google authorization to Emily's session using hashed state and encrypted PKCE", async () => {
+  it("binds Google web-server authorization to Matt's guardian session using one-time hashed state", async () => {
     const store = new MemorySourceStore();
     const result = await startGoogleClassroomConnection({
       session,
@@ -74,10 +76,8 @@ describe("read-only source connection orchestration", () => {
     });
     expect(store.oauth[0]?.stateHash).toMatch(/^[a-f0-9]{64}$/);
     expect(store.oauth[0]?.stateHash).not.toBe(state);
-    expect(store.oauth[0]?.codeVerifierCiphertext).toMatch(/^v1\./);
-    expect(store.oauth[0]?.codeVerifierCiphertext).not.toBe(
-      new URL(result.authorizationUrl).searchParams.get("code_challenge")
-    );
+    expect(new URL(result.authorizationUrl).searchParams.has("code_challenge")).toBe(false);
+    expect(result.proof.authorizationFlow).toBe("web_server");
   });
 
   it("completes Google OAuth, syncs live records, and persists only the encrypted refresh token", async () => {
@@ -115,12 +115,151 @@ describe("read-only source connection orchestration", () => {
     });
 
     expect(exchange).toHaveBeenCalledWith(expect.objectContaining({
-      code: "authorization-code",
-      codeVerifier: expect.any(String)
+      code: "authorization-code"
     }));
+    expect(exchange.mock.calls[0]?.[0]).not.toHaveProperty("codeVerifier");
     expect(syncStudentSnapshot).toHaveBeenCalledWith("access-plaintext");
     expect(store.connections[0]?.secretCiphertext).not.toContain("refresh-plaintext");
     expect(JSON.stringify(store.classroomWrites)).not.toContain("access-plaintext");
+  });
+
+  it("classifies OAuth completion failures by safe stage without exposing provider secrets", async () => {
+    const store = new MemorySourceStore();
+    const start = async (seed: number) => {
+      const started = await startGoogleClassroomConnection({
+        session,
+        store,
+        sourceEncryptionSecret: sourceSecret,
+        googleClientId: "client.apps.googleusercontent.com",
+        googleRedirectUri: "https://homeroom.example/api/integrations/google/callback",
+        randomBytes: (size) => Uint8Array.from({ length: size }, (_, index) => ((index + seed) % 251) + 1)
+      });
+      return new URL(started.authorizationUrl).searchParams.get("state")!;
+    };
+    const common = {
+      session,
+      store,
+      sourceEncryptionSecret: sourceSecret,
+      googleClientId: "client.apps.googleusercontent.com",
+      googleClientSecret: "client-secret",
+      googleRedirectUri: "https://homeroom.example/api/integrations/google/callback"
+    };
+
+    const tokenState = await start(1);
+    const tokenFailure = completeGoogleClassroomConnection({
+      ...common,
+      state: tokenState,
+      code: "authorization-code",
+      exchange: vi.fn().mockRejectedValue(new Error("client-secret-and-code"))
+    });
+    await expect(tokenFailure).rejects.toMatchObject({
+      name: "SourceConnectionError",
+      code: "SOURCE_OAUTH_EXCHANGE_FAILED",
+      message: "Google authorization could not be completed."
+    });
+    await expect(tokenFailure).rejects.not.toThrow(/client-secret-and-code/);
+
+    const invalidGrantState = await start(4);
+    const invalidGrantFailure = completeGoogleClassroomConnection({
+      ...common,
+      state: invalidGrantState,
+      code: "authorization-code",
+      exchange: vi.fn().mockRejectedValue(
+        new GoogleClassroomSourceError(
+          "Google rejected the authorization grant.",
+          "GOOGLE_TOKEN_INVALID_GRANT"
+        )
+      )
+    });
+    await expect(invalidGrantFailure).rejects.toMatchObject({
+      name: "SourceConnectionError",
+      code: "SOURCE_OAUTH_INVALID_GRANT",
+      message: "Google rejected the one-time authorization grant."
+    });
+
+    const safeExchangeCases = [
+      ["GOOGLE_TOKEN_INVALID_CLIENT", "SOURCE_OAUTH_INVALID_CLIENT"],
+      ["GOOGLE_TOKEN_REJECTED", "SOURCE_OAUTH_TOKEN_REJECTED"],
+      ["GOOGLE_TOKEN_NETWORK_FAILED", "SOURCE_OAUTH_NETWORK_FAILED"],
+      ["GOOGLE_TOKEN_RESPONSE_INVALID", "SOURCE_OAUTH_RESPONSE_INVALID"],
+      ["GOOGLE_SOURCE_UNAVAILABLE", "SOURCE_OAUTH_PROVIDER_UNAVAILABLE"]
+    ] as const;
+    let seed = 5;
+    for (const [providerCode, sourceCode] of safeExchangeCases) {
+      const state = await start(seed);
+      seed += 1;
+      const failure = completeGoogleClassroomConnection({
+        ...common,
+        state,
+        code: "authorization-code",
+        exchange: vi.fn().mockRejectedValue(
+          new GoogleClassroomSourceError("provider-secret-detail", providerCode)
+        )
+      });
+      await expect(failure).rejects.toMatchObject({
+        name: "SourceConnectionError",
+        code: sourceCode
+      });
+      await expect(failure).rejects.not.toThrow(/provider-secret-detail/);
+    }
+
+    const crossRealmState = await start(9);
+    const crossRealmFailure = completeGoogleClassroomConnection({
+      ...common,
+      state: crossRealmState,
+      code: "authorization-code",
+      exchange: vi.fn().mockRejectedValue({
+        name: "GoogleClassroomSourceError",
+        code: "GOOGLE_TOKEN_REJECTED",
+        message: "provider-secret-detail"
+      })
+    });
+    await expect(crossRealmFailure).rejects.toMatchObject({
+      name: "SourceConnectionError",
+      code: "SOURCE_OAUTH_TOKEN_REJECTED"
+    });
+    await expect(crossRealmFailure).rejects.not.toThrow(/provider-secret-detail/);
+
+    const classroomState = await start(2);
+    const classroomFailure = completeGoogleClassroomConnection({
+      ...common,
+      state: classroomState,
+      code: "authorization-code",
+      exchange: vi.fn().mockResolvedValue({
+        accessToken: "access-secret",
+        refreshToken: "refresh-secret",
+        expiresIn: 3_600,
+        scope: null
+      }),
+      classroom: { syncStudentSnapshot: vi.fn().mockRejectedValue(new Error("bearer-access-secret")) }
+    });
+    await expect(classroomFailure).rejects.toMatchObject({
+      name: "SourceConnectionError",
+      code: "SOURCE_CLASSROOM_READ_FAILED",
+      message: "Google connected, but Classroom data could not be read."
+    });
+    await expect(classroomFailure).rejects.not.toThrow(/bearer-access-secret/);
+
+    const storageState = await start(3);
+    store.saveClassroomConnection = vi.fn().mockRejectedValue(new Error("encrypted-refresh-secret"));
+    const storageFailure = completeGoogleClassroomConnection({
+      ...common,
+      state: storageState,
+      code: "authorization-code",
+      exchange: vi.fn().mockResolvedValue({
+        accessToken: "access-secret",
+        refreshToken: "refresh-secret",
+        expiresIn: 3_600,
+        scope: null
+      }),
+      classroom: { syncStudentSnapshot: vi.fn().mockResolvedValue({ courses: [], coursework: [], evidenceIds: [] }) }
+    });
+    await expect(storageFailure).rejects.toBeInstanceOf(SourceConnectionError);
+    await expect(storageFailure).rejects.toMatchObject({
+      code: "SOURCE_CONNECTION_SAVE_FAILED",
+      message: "Google connected, but the Classroom connection could not be saved."
+    });
+    await expect(storageFailure).rejects.not.toThrow(/encrypted-refresh-secret/);
   });
 
   it("connects and re-syncs a BAND feed using an encrypted URL", async () => {
@@ -281,18 +420,18 @@ describe("read-only source connection orchestration", () => {
       calendar,
       now: () => new Date("2026-07-18T18:10:00.000Z")
     });
-    expect(first.displayName).toBe("BAND calendar");
+    expect(first.displayName).toBe("BAND app calendar");
     expect(store.connections[0]).toMatchObject({ id: first.id, createdAt: first.createdAt, displayName: "Emily's band" });
   });
 
-  it("rejects guardian scope and missing source connections", async () => {
+  it("rejects student management attempts and missing source connections", async () => {
     await expect(startGoogleClassroomConnection({
-      session: { ...session, actorId: "guardian_matt", role: "guardian" },
+      session: { ...session, actorId: "student_emily", role: "student" },
       store: new MemorySourceStore(),
       sourceEncryptionSecret: sourceSecret,
       googleClientId: "client.apps.googleusercontent.com",
       googleRedirectUri: "https://homeroom.example/api/integrations/google/callback"
-    })).rejects.toThrow(/student/i);
+    })).rejects.toThrow(/guardian/i);
 
     await expect(syncSourceConnection({
       session,

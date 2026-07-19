@@ -100,7 +100,16 @@ export interface ClassroomSnapshot {
 }
 
 export class GoogleClassroomSourceError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code:
+      | "GOOGLE_SOURCE_UNAVAILABLE"
+      | "GOOGLE_TOKEN_INVALID_GRANT"
+      | "GOOGLE_TOKEN_INVALID_CLIENT"
+      | "GOOGLE_TOKEN_NETWORK_FAILED"
+      | "GOOGLE_TOKEN_RESPONSE_INVALID"
+      | "GOOGLE_TOKEN_REJECTED" = "GOOGLE_SOURCE_UNAVAILABLE"
+  ) {
     super(message);
     this.name = "GoogleClassroomSourceError";
   }
@@ -111,18 +120,6 @@ export interface GoogleTokenResult {
   refreshToken: string | null;
   expiresIn: number | null;
   scope: string | null;
-}
-
-function base64Url(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-async function pkceChallenge(verifier: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-  return base64Url(new Uint8Array(digest));
 }
 
 function assertRedirectUri(value: string): void {
@@ -140,13 +137,9 @@ export async function createGoogleClassroomAuthorizationUrl(input: {
   clientId: string;
   redirectUri: string;
   state: string;
-  codeVerifier: string;
 }): Promise<string> {
   if (input.clientId.length < 10) throw new GoogleClassroomSourceError("Google OAuth client ID is invalid.");
   if (input.state.length < 32) throw new GoogleClassroomSourceError("Google OAuth state is invalid.");
-  if (input.codeVerifier.length < 43 || input.codeVerifier.length > 128) {
-    throw new GoogleClassroomSourceError("Google OAuth PKCE verifier is invalid.");
-  }
   assertRedirectUri(input.redirectUri);
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", input.clientId);
@@ -157,8 +150,6 @@ export async function createGoogleClassroomAuthorizationUrl(input: {
   url.searchParams.set("include_granted_scopes", "true");
   url.searchParams.set("prompt", "consent");
   url.searchParams.set("state", input.state);
-  url.searchParams.set("code_challenge", await pkceChallenge(input.codeVerifier));
-  url.searchParams.set("code_challenge_method", "S256");
   return url.toString();
 }
 
@@ -184,13 +175,18 @@ function dueTime(value: z.infer<typeof courseworkSchema>["dueTime"]): string | n
   return `${String(value.hours ?? 0).padStart(2, "0")}:${String(value.minutes ?? 0).padStart(2, "0")}:${String(value.seconds ?? 0).padStart(2, "0")}`;
 }
 
-async function readBoundedJson(response: Response): Promise<unknown> {
+async function readBoundedText(response: Response): Promise<string> {
   const declared = Number(response.headers.get("content-length") ?? 0);
   if (Number.isFinite(declared) && declared > 1_000_000) {
     throw new GoogleClassroomSourceError("The Google Classroom source response is too large.");
   }
   const text = await response.text();
   if (text.length > 1_000_000) throw new GoogleClassroomSourceError("The Google Classroom source response is too large.");
+  return text;
+}
+
+async function readBoundedJson(response: Response): Promise<unknown> {
+  const text = await readBoundedText(response);
   if (!response.ok) throw new GoogleClassroomSourceError("The Google Classroom source could not be read.");
   try {
     return JSON.parse(text) as unknown;
@@ -200,16 +196,64 @@ async function readBoundedJson(response: Response): Promise<unknown> {
 }
 
 async function tokenRequest(body: URLSearchParams, fetcher: typeof fetch): Promise<GoogleTokenResult> {
-  const response = await fetcher("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body,
-    redirect: "error"
-  });
-  const parsed = tokenResponseSchema.parse(await readBoundedJson(response));
+  let response: Response;
+  try {
+    response = await fetcher("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body,
+      redirect: "manual"
+    });
+  } catch {
+    throw new GoogleClassroomSourceError(
+      "Google's token service could not be reached.",
+      "GOOGLE_TOKEN_NETWORK_FAILED"
+    );
+  }
+  if (response.status >= 300 && response.status < 400) {
+    throw new GoogleClassroomSourceError(
+      "Google redirected the token request.",
+      "GOOGLE_TOKEN_REJECTED"
+    );
+  }
+  const text = await readBoundedText(response);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text) as unknown;
+  } catch {
+    throw new GoogleClassroomSourceError("Google returned an invalid token response.");
+  }
+  if (!response.ok) {
+    const result = z.object({ error: z.string().max(128) }).passthrough().safeParse(raw);
+    const reason = result.success ? result.data.error : "";
+    if (reason === "invalid_grant") {
+      throw new GoogleClassroomSourceError(
+        "Google rejected the authorization grant.",
+        "GOOGLE_TOKEN_INVALID_GRANT"
+      );
+    }
+    if (reason === "invalid_client") {
+      throw new GoogleClassroomSourceError(
+        "Google rejected the OAuth client.",
+        "GOOGLE_TOKEN_INVALID_CLIENT"
+      );
+    }
+    throw new GoogleClassroomSourceError(
+      "Google rejected the token request.",
+      "GOOGLE_TOKEN_REJECTED"
+    );
+  }
+  const parsedResult = tokenResponseSchema.safeParse(raw);
+  if (!parsedResult.success) {
+    throw new GoogleClassroomSourceError(
+      "Google returned an invalid token response.",
+      "GOOGLE_TOKEN_RESPONSE_INVALID"
+    );
+  }
+  const parsed = parsedResult.data;
   return {
     accessToken: parsed.access_token,
     refreshToken: parsed.refresh_token ?? null,
@@ -220,16 +264,12 @@ async function tokenRequest(body: URLSearchParams, fetcher: typeof fetch): Promi
 
 export async function exchangeGoogleAuthorizationCode(input: {
   code: string;
-  codeVerifier: string;
   clientId: string;
   clientSecret: string;
   redirectUri: string;
   fetcher?: typeof fetch;
 }): Promise<GoogleTokenResult> {
   if (!input.code || input.code.length > 4_096) throw new GoogleClassroomSourceError("Google authorization code is invalid.");
-  if (input.codeVerifier.length < 43 || input.codeVerifier.length > 128) {
-    throw new GoogleClassroomSourceError("Google OAuth PKCE verifier is invalid.");
-  }
   if (!input.clientId || !input.clientSecret) throw new GoogleClassroomSourceError("Google OAuth is not configured.");
   assertRedirectUri(input.redirectUri);
   return tokenRequest(new URLSearchParams({
@@ -237,7 +277,6 @@ export async function exchangeGoogleAuthorizationCode(input: {
     client_id: input.clientId,
     client_secret: input.clientSecret,
     redirect_uri: input.redirectUri,
-    code_verifier: input.codeVerifier,
     grant_type: "authorization_code"
   }), input.fetcher ?? fetch);
 }
@@ -271,7 +310,7 @@ export class GoogleClassroomAdapter {
     return readBoundedJson(await this.fetcher(url, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-      redirect: "error"
+      redirect: "manual"
     }));
   }
 

@@ -37,7 +37,7 @@ export async function handleOpenProof(
   try {
     assertSameOrigin(request);
     assertJsonRequest(request);
-    if (!dependencies.rateLimiter.consume(dependencies.clientKey)) {
+    if (!(await dependencies.rateLimiter.consume(dependencies.clientKey))) {
       return json(
         { error: { code: "RATE_LIMITED", message: "Please wait a moment before reopening proof." } },
         429,

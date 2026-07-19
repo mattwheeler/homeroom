@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { bandCampV1, bandCampV2, diffBandSource, emilyFixture, guardianAction, packingMaterial } from "../domain/fixtures";
+import {
+  buildStudentSupportPolicy,
+  emilyStudentSupportProfile
+} from "../domain/student-support-profile";
 import type { AiTurnRecord, AiTurnStore } from "../storage/ai-turn-store";
 import type { SessionRecord } from "../storage/session-store";
 import { morningPlanSchema, type MorningPlan } from "./morning-plan";
@@ -24,6 +28,7 @@ export type PlanRevision = z.infer<typeof planRevisionSchema>;
 const instructions = `You are Homeroom, a calm AI workspace for Emily, a 14-year-old entering ninth grade.
 Call get_plan_revision_context exactly once. Explain only the validated BAND calendar change: check-in moved from 07:30 to 07:15.
 Propose Plan V2 by shifting wake-up, bag check, departure, and check-in exactly 15 minutes earlier while preserving the 08:00 start, travel time, arrival buffer, packing responsibilities, and Matt's separate physical-form task.
+Use the supplied student-support policy so the revised visual timeline explicitly reinforces time management, organization, and the reason for the highest-priority change.
 Plan V1 remains active. You cannot save, sync, publish, or replace a plan. Ask Emily to review Plan V2 before it is saved.`;
 
 export class PlanRevisionError extends Error {
@@ -136,6 +141,7 @@ export async function generatePlanRevision(input: {
   let trace: Awaited<ReturnType<typeof runResponsesTurn>>["trace"] | null = null;
 
   try {
+    const studentSupport = buildStudentSupportPolicy(emilyStudentSupportProfile);
     const result = await runResponsesTurn({
       client: input.client,
       stage: "plan_revision",
@@ -161,6 +167,7 @@ export async function generatePlanRevision(input: {
             after: bandCampV2
           },
           unchangedContext: { packingMaterial, guardianAction },
+          studentSupport,
           policy: { proposalOnly: true, activePlanRemains: 1, requiresStudentApprovalToSave: true }
         };
       }

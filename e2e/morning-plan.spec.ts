@@ -36,8 +36,8 @@ const revision = {
   }
 };
 
-test("Emily completes the Golden privacy and guardian-sharing journey", async ({ page }) => {
-  await page.route("**/api/demo-sessions", async (route) => {
+test("Emily independently uses learning, family help, and a live day plan", async ({ page }) => {
+  await page.route("**/api/sessions", async (route) => {
     await route.fulfill({
       status: 201,
       contentType: "application/json",
@@ -58,6 +58,68 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
         courses: [{ provider: "google_classroom", externalId: "google-course-algebra", name: "Algebra I - Period 2", section: "P2", subject: "Mathematics", courseState: "ACTIVE", alternateLink: null, calendarId: null, trackCourseId: "course_algebra_1" }],
         coursework: [{ provider: "google_classroom", externalId: "work-1", courseExternalId: "google-course-algebra", title: "Linear equations warm-up", description: null, workType: "ASSIGNMENT", dueDate: "2026-08-18", dueTime: "15:00:00", alternateLink: null, updateTime: "2026-07-18T12:00:00.000Z", submissionState: "NEW", late: false }],
         events: []
+      })
+    });
+  });
+  await page.route("**/api/student/projection", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        generatedAt: "2026-07-18T12:00:00.000Z",
+        context: { localDate: "2026-07-18", age: 14, grade: 9, timeZone: "America/Chicago", scaffoldLevel: "guided_independence", visualFirst: true },
+        sourceSummary: { courseCount: 7, actionableCourseworkCount: 14, completedCourseworkCount: 0, eventCount: 0, connections: [] },
+        skillScaffolds: [
+          { skill: "time_management", label: "Plan the time", studentAction: "Choose a timebox.", adultBoundary: "Student chooses.", visualPattern: "timebox", supportLevel: "developing" },
+          { skill: "organization", label: "Set up the work", studentAction: "Gather what you need.", adultBoundary: "Student owns the work.", visualPattern: "course_buckets", supportLevel: "developing" },
+          { skill: "prioritization", label: "Choose what matters", studentAction: "Use due date and effort.", adultBoundary: "Student chooses.", visualPattern: "urgency_effort_matrix", supportLevel: "developing" }
+        ],
+        today: { date: "2026-07-18", timeline: [] },
+        week: { startDate: "2026-07-18", endDate: "2026-07-24", days: [{ date: "2026-07-18", label: "Sat, Jul 18", items: [] }] },
+        priorities: [{
+          id: "google_classroom:coursework:work-1", rank: 1, priorityBand: "plan_next", title: "Linear equations warm-up",
+          course: { externalId: "google-course-algebra", name: "Algebra I - Period 2", trackCourseId: "course_algebra_1" },
+          due: { date: "2026-08-18", time: "15:00:00" },
+          urgency: { level: "later", label: "Due later", visualToken: "green", daysUntilDue: 31 },
+          effort: { level: "medium", label: "20-minute focus block", estimatedMinutes: 20, recommendedTimeboxMinutes: 20 },
+          rationale: { summary: "Upcoming and ready to plan.", signals: ["Due later", "About 20 minutes", "Not submitted"] },
+          chunks: [
+            { id: "setup", order: 1, label: "Set up", action: "Open the directions.", minutes: 3, skill: "organization", visualState: "ready" },
+            { id: "focus", order: 2, label: "Focus", action: "Work one visible section.", minutes: 12, skill: "time_management", visualState: "next" },
+            { id: "check", order: 3, label: "Check", action: "Review and choose the next step.", minutes: 5, skill: "prioritization", visualState: "check" }
+          ],
+          source: { provider: "google_classroom", recordType: "coursework", externalId: "work-1", sourceUpdatedAt: null }
+        }],
+        learningRecommendations: [{
+          id: "learning:work-1", courseId: "course_algebra_1", courseName: "Algebra I - Period 2",
+          missionId: "readiness_algebra_balance_01", missionTitle: "Equations stay balanced",
+          objective: "Explain why both sides need the same operation.", suggestedMinutes: 10,
+          supportPreference: "example_first", rationale: "Prepare the skill used by upcoming work.",
+          visual: { format: "worked_example_then_steps", stepCount: 3, progressStyle: "visible_timebox_and_steps" },
+          evidence: []
+        }],
+        guardianAssistCandidates: [{
+          id: "guardian:google_classroom:coursework:physical-form",
+          taskId: "google_classroom:coursework:physical-form",
+          title: "Band physical form",
+          courseName: "Concert Band - Period 6",
+          due: { date: "2026-07-24", time: "17:00:00" },
+          reason: "The connected school source indicates that a parent or guardian may need to handle this item.",
+          source: { provider: "google_classroom", recordType: "coursework", externalId: "physical-form", sourceUpdatedAt: null }
+        }],
+        classes: [
+          ["english", "English I - Period 1", "course_english_1"],
+          ["algebra", "Algebra I - Period 2", "course_algebra_1"],
+          ["biology", "Biology - Period 3", "course_biology"],
+          ["geography", "World Geography - Period 4", "course_world_geography"],
+          ["spanish", "Spanish I - Period 5", "course_spanish_1"],
+          ["band", "Concert Band - Period 6", "course_band"],
+          ["art", "Art I - Period 7", "course_art_1"]
+        ].map(([externalId, name, trackCourseId]) => ({
+          externalId, name, section: null, subject: null, trackCourseId, alternateLink: null,
+          source: { provider: "google_classroom", recordType: "course", externalId, sourceUpdatedAt: null }
+        }))
       })
     });
   });
@@ -86,7 +148,7 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
     });
   });
   await page.route("**/api/family/reminder/preview", async (route) => {
-    expect(route.request().postDataJSON()).toEqual({});
+    expect(route.request().postDataJSON()).toEqual({ taskId: "google_classroom:coursework:physical-form" });
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
       preview: { title: "Band physical form needs your help", message: "Emily needs your help completing the band physical form by Friday, July 24.", task: { label: "Complete the band physical form", dueAt: "2026-07-24T17:00:00-05:00" }, recipient: { name: "Matt" } },
       approval: { actionId: "action_444444444444444444444444", receipt: "family-reminder-receipt-long", expiresAt: "2026-07-18T12:06:00.000Z" },
@@ -152,6 +214,16 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
           message: "We’ll use one quick example, then you’ll take the lead.",
           question: "When an equation changes on one side, what must happen on the other side?",
           encouragement: "This is a starting point, not a grade.",
+          executiveSkill: "organization",
+          nextAction: "Set up both sides before choosing an operation.",
+          visualScaffold: {
+            kind: "comparison",
+            title: "Keep both sides balanced",
+            items: [
+              { label: "Left side", detail: "Apply one operation." },
+              { label: "Right side", detail: "Apply the same operation." }
+            ]
+          },
           answerPolicy: "coach_not_complete"
         },
         timing: { targetEndsAt: "2099-07-18T12:10:00.000Z", remainingSeconds: 590, phase: "check_in" },
@@ -176,6 +248,17 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
           message: "Exactly—the equality has to remain true.",
           question: "If we subtract 3 from the left side, what should we do to the right side?",
           encouragement: "You identified the central idea.",
+          executiveSkill: "prioritization",
+          nextAction: "Choose the operation that keeps equality true.",
+          visualScaffold: {
+            kind: "sequence",
+            title: "Choose, apply, check",
+            items: [
+              { label: "Choose", detail: "Name the inverse operation." },
+              { label: "Apply", detail: "Use it on both sides." },
+              { label: "Check", detail: "Confirm the sides stay equal." }
+            ]
+          },
           answerPolicy: "coach_not_complete"
         },
         timing: { targetEndsAt: "2099-07-18T12:10:00.000Z", remainingSeconds: 540, phase: "diagnostic" },
@@ -472,10 +555,14 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(proofView) });
   });
 
-  await page.goto("/");
-  await page.getByRole("button", { name: "Start my day" }).click();
+  await page.goto("/student");
+  await expect(page.getByRole("heading", { name: "Grade 9 summer readiness is ready." })).toBeVisible();
+  await page.getByRole("button", { name: "Show me my first step" }).click();
+  await expect(page.getByRole("heading", { name: "One thing at a time." })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Learn" }).click();
+  await page.getByRole("button", { name: "Show all 7 classes" }).click();
   await expect(page.getByRole("button", { name: /Open .* learning track/ })).toHaveCount(7);
-  await expect(page.getByText("Linear equations warm-up", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Open Algebra I - Period 2 learning track" }).click();
   const learningRoom = page.getByRole("dialog", { name: "Algebra I - Period 2 Learning Room" });
   await expect(learningRoom).toBeVisible();
@@ -487,7 +574,7 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
   await expect(learningRoom.getByRole("button", { name: "Back to classes" })).toBeDisabled();
   await expect(page.getByText("We’ll use one quick example, then you’ll take the lead.", { exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Your response to Homeroom" }).fill("Both sides have to stay equal.");
-  await page.getByRole("button", { name: "Send to coach" }).click();
+  await page.getByRole("button", { name: "Share my thinking" }).click();
   await expect(page.getByText("Exactly—the equality has to remain true.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "End and save session" }).click();
   await expect(page.getByRole("heading", { name: "What Homeroom remembers" })).toBeVisible();
@@ -497,61 +584,29 @@ test("Emily completes the Golden privacy and guardian-sharing journey", async ({
   await expect(page.getByRole("heading", { name: "What Homeroom remembers" })).toBeHidden();
   await learningRoom.getByRole("button", { name: "Back to classes" }).click();
   await expect(learningRoom).toBeHidden();
-  await page.getByRole("button", { name: "Ask Matt" }).click();
-  await expect(page.getByRole("heading", { name: "Exact notification for Matt" })).toBeVisible();
-  await page.getByRole("button", { name: "Approve and notify Matt" }).click();
-  await expect(page.getByText("Delivered to Matt's Homeroom inbox", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Build my morning plan" }).click();
 
-  await expect(page.getByRole("heading", { name: plan.title })).toBeVisible();
-  await expect(page.locator("time").getByText("06:30", { exact: true })).toBeVisible();
-  await expect(page.locator("time").getByText("07:30", { exact: true })).toBeVisible();
-  await expect(page.getByText(plan.guardianNote)).toBeVisible();
-  await expect(page.getByText("Live GPT-5.6 Sol")).toBeVisible();
-  await expect(page.getByText("Nothing has been saved yet")).toBeVisible();
-  await page.getByRole("button", { name: "Approve and save Plan V1" }).click();
-  await expect(page.getByText("Plan V1 saved")).toBeVisible();
-  await expect(page.getByText("Saved by Emily · Source version 1")).toBeVisible();
-  await page.getByRole("button", { name: "Check BAND for updates" }).click();
-  await expect(page.getByRole("heading", { name: revision.change.title })).toBeVisible();
-  await expect(page.locator(".time-diff").getByText("7:30 AM", { exact: true })).toBeVisible();
-  await expect(page.locator(".time-diff").getByText("7:15 AM", { exact: true })).toBeVisible();
-  await expect(page.getByText("FROM BAND CALENDAR · SOURCE V2", { exact: true })).toBeVisible();
-  await expect(page.locator(".time-track").getByText("7:15 AM", { exact: true })).toBeVisible();
-  await expect(page.getByText("Plan V1 is still active", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Approve and save Plan V2" }).click();
-  await expect(page.getByText("Plan V2 saved", { exact: true })).toBeVisible();
-  await expect(page.getByText("Saved by Emily · Source version 2", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Start Algebra refresher" }).click();
-  await expect(page.getByRole("heading", { name: "Undo one layer" })).toBeVisible();
-  await expect(page.getByText("Live GPT-5.6 Sol hint", { exact: true })).toBeVisible();
-  await expect(page.getByText("Answer hidden until you solve it", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Divide both sides by 3" }).click();
-  await expect(page.getByText("x + 2 = 6", { exact: true })).toBeVisible();
-  await page.getByRole("textbox", { name: "What is x?" }).fill("4");
-  await page.getByRole("button", { name: "Check my answer" }).click();
-  await expect(page.getByText("Practice complete", { exact: true })).toBeVisible();
-  await expect(page.getByText("You solved it one step at a time.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Deterministically graded · 2 attempts · 1 hint", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Preview optional progress summary" }).click();
-  const guardianPreview = page.locator(".guardian-preview");
-  await expect(guardianPreview.getByRole("heading", { name: "Exactly what Matt will see" })).toBeVisible();
-  await expect(guardianPreview.getByText("Not shared yet", { exact: true })).toBeVisible();
-  await expect(guardianPreview.getByText("Algebra answer", { exact: true })).toBeVisible();
-  await expect(guardianPreview.getByText("private coaching", { exact: true })).toBeVisible();
-  await expect(guardianPreview).not.toContainText("x = 4");
-  await expect(guardianPreview).not.toContainText("2 attempts");
-  await page.getByRole("button", { name: "Approve and share with Matt" }).click();
-  await expect(guardianPreview.getByText("Shared with Matt", { exact: true })).toBeVisible();
-  await expect(guardianPreview.getByText("STATE 14", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Open judge proof" }).click();
-  const proof = page.locator(".proof-view");
-  await expect(proof.getByRole("heading", { name: "Golden Experience verified" })).toBeVisible();
-  await expect(proof.getByText("STATE 15 · COMPLETE", { exact: true })).toBeVisible();
-  await expect(proof.getByText("3 LIVE GPT TURNS", { exact: true })).toBeVisible();
-  await expect(proof.getByText("get_morning_plan_context", { exact: true })).toBeVisible();
-  await expect(proof.getByText("Guardian-safe view published", { exact: true })).toBeVisible();
-  await expect(proof.getByText("Private learning details exposed", { exact: true })).toBeVisible();
-  await expect(proof).not.toContainText("x = 4");
-  await expect(proof).not.toContainText("2 attempts");
+  await page.getByRole("tab", { name: "Today" }).click();
+  await page.getByText("Something Matt may need to handle", { exact: true }).click();
+  await page.getByRole("button", { name: "Ask Matt about this" }).click();
+  await expect(page.getByText("EXACT MESSAGE PREVIEW · NOT SENT YET", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Approve and notify Matt" }).click();
+  await expect(page.getByText("Delivered to Matt’s Homeroom inbox", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Build today’s live plan" }).click();
+  const planner = page.getByRole("dialog", { name: "Build a routine from today’s real sources" });
+  await planner.getByRole("button", { name: "Suggest a plan for today" }).click();
+
+  await expect(planner.getByRole("heading", { name: plan.title })).toBeVisible();
+  await expect(planner.getByText("6:30 AM", { exact: true })).toBeVisible();
+  await expect(planner.getByText("7:30 AM", { exact: true })).toBeVisible();
+  await expect(planner.getByText("Does this feel useful?", { exact: true })).toBeVisible();
+  await planner.getByRole("button", { name: "Use this plan" }).click();
+  await expect(planner.getByRole("heading", { name: "Emily, your plan is ready." })).toBeVisible();
+  await planner.getByRole("button", { name: "Refresh from latest sources" }).click();
+  await expect(planner.getByRole("heading", { name: revision.plan.title })).toBeVisible();
+  await expect(planner.getByText("7:15 AM", { exact: true }).first()).toBeVisible();
+  await expect(planner.getByText(revision.change.summary, { exact: true })).toBeVisible();
+  await planner.getByRole("button", { name: "Use this plan" }).click();
+  await expect(planner.getByText("PLAN VERSION 2 SAVED", { exact: true })).toBeVisible();
+  await expect(planner.getByText(/ignore it and choose something else/)).toBeVisible();
 });

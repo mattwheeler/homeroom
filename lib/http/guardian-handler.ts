@@ -52,7 +52,7 @@ async function handleGuardianRequest<T>(input: {
   try {
     assertSameOrigin(input.request);
     assertJsonRequest(input.request);
-    if (!input.dependencies.rateLimiter.consume(input.dependencies.clientKey)) {
+    if (!(await input.dependencies.rateLimiter.consume(input.dependencies.clientKey))) {
       return json(
         { error: { code: "RATE_LIMITED", message: "Please wait a moment before trying again." } },
         429,

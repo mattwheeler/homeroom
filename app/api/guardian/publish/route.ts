@@ -2,11 +2,11 @@ import { env } from "cloudflare:workers";
 
 import { approveGuardianProjection } from "../../../../lib/domain/guardian-projection";
 import { handleGuardianPublish } from "../../../../lib/http/guardian-handler";
-import { FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
+import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
 import { D1GuardianProjectionStore } from "../../../../lib/storage/guardian-store";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
 
-const limiter = new FixedWindowRateLimiter({ limit: 8, windowMs: 60_000 });
+const limiter = new D1FixedWindowRateLimiter(env.HOMEROOM_DB, { limit: 8, windowMs: 60_000, namespace: "guardian-publish" });
 
 export async function POST(request: Request) {
   if (!env.SESSION_SIGNING_SECRET || env.SESSION_SIGNING_SECRET.length < 32) {

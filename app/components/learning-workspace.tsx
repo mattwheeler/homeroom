@@ -1,20 +1,35 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 
 import {
   getLearningTrack,
   type CourseId,
   type LearningTrack
 } from "../../lib/domain/learning-tracks";
+import {
+  buildStudentSupportPolicy,
+  emilyStudentSupportProfile
+} from "../../lib/domain/student-support-profile";
 import type {
   LearningDurationMinutes,
   SupportPreference
 } from "../../lib/domain/learning-session";
+import {
+  LearningPriorityCard,
+  LearningSessionRoadmap,
+  LearningTimebox,
+  SubjectVisualScaffold,
+  TaskChunkOrganizer,
+  type LearningPhase
+} from "./learning-visual-tools";
 
 interface Course {
   id: CourseId;
   name: string;
+  mode?: "connected_class" | "grade_readiness";
+  reason?: string;
 }
 
 interface LearningTurn {
@@ -23,6 +38,13 @@ interface LearningTurn {
   question: string;
   encouragement: string;
   answerPolicy: "coach_not_complete";
+  executiveSkill?: "time_management" | "organization" | "prioritization";
+  nextAction?: string;
+  visualScaffold?: {
+    kind: "sequence" | "comparison" | "organizer" | "timeline" | "grid";
+    title: string;
+    items: Array<{ label: string; detail: string }>;
+  };
 }
 
 interface StartLearningResponse {
@@ -97,11 +119,22 @@ type Dialogue =
   | { role: "coach"; turn: LearningTurn }
   | { role: "student"; text: string };
 
-const preferenceLabels: Record<SupportPreference, { title: string; detail: string }> = {
-  example_first: { title: "Example first", detail: "Show one, then let me try." },
-  questions_first: { title: "Questions first", detail: "Help me find my starting point." },
-  mix_it_up: { title: "Mix it up", detail: "Alternate examples and questions." }
+const preferenceLabels: Record<SupportPreference, { icon: string; title: string; detail: string }> = {
+  example_first: { icon: "▣", title: "Example first", detail: "Show one, then let me try." },
+  questions_first: { icon: "?", title: "Questions first", detail: "Help me find my starting point." },
+  mix_it_up: { icon: "↔", title: "Mix it up", detail: "Alternate examples and questions." }
 };
+
+const studentSupportPolicy = buildStudentSupportPolicy(emilyStudentSupportProfile);
+
+function recommendationReason(course: Course): string {
+  if (course.reason) return course.reason;
+  const courseId = course.id;
+  if (courseId === "course_band") return "Band camp is coming up";
+  if (courseId === "course_algebra_1") return "Practice for upcoming Algebra work";
+  if (courseId === "course_english_1") return "Get ready for your reading reflection";
+  return "A short readiness practice for this class";
+}
 
 function errorMessage(value: unknown, fallback: string): string {
   if (!value || typeof value !== "object" || !("error" in value)) return fallback;
@@ -110,19 +143,18 @@ function errorMessage(value: unknown, fallback: string): string {
   return typeof error.message === "string" ? error.message : fallback;
 }
 
-function displayTimer(seconds: number): string {
-  const safe = Math.max(0, Math.floor(seconds));
-  return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
-}
-
 export function LearningWorkspace({
   courses,
-  csrfToken
+  csrfToken,
+  initialCourseId = null,
+  grade = 9
 }: {
   courses: readonly Course[];
   csrfToken: string;
+  initialCourseId?: CourseId | null;
+  grade?: number;
 }) {
-  const [selectedCourseId, setSelectedCourseId] = useState<CourseId | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<CourseId | null>(initialCourseId);
   const [durationMinutes, setDurationMinutes] = useState<LearningDurationMinutes>(10);
   const [supportPreference, setSupportPreference] = useState<SupportPreference>("example_first");
   const [status, setStatus] = useState<"idle" | "starting" | "active" | "sending" | "completing" | "completed" | "error">("idle");
@@ -133,6 +165,7 @@ export function LearningWorkspace({
   const [context, setContext] = useState<LearnerContextResponse | null>(null);
   const [completion, setCompletion] = useState<CompleteLearningResponse | null>(null);
   const [deletedSignals, setDeletedSignals] = useState<string[]>([]);
+  const [showAllCourses, setShowAllCourses] = useState(false);
   const [error, setError] = useState("");
   const roomRef = useRef<HTMLElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -145,10 +178,27 @@ export function LearningWorkspace({
     () => courses.find((course) => course.id === selectedCourseId) ?? null,
     [courses, selectedCourseId]
   );
+  const recommendedCourses = useMemo(() => {
+    const preferredOrder: CourseId[] = ["course_band", "course_algebra_1", "course_english_1"];
+    return [...courses].sort((left, right) => {
+      const leftRank = preferredOrder.indexOf(left.id);
+      const rightRank = preferredOrder.indexOf(right.id);
+      return (leftRank === -1 ? 99 : leftRank) - (rightRank === -1 ? 99 : rightRank);
+    });
+  }, [courses]);
+  const visibleCourses = showAllCourses
+    ? recommendedCourses
+    : recommendedCourses.slice(0, studentSupportPolicy.attentionSupport.classChoicesBeforeExpand);
+  const gradeReadinessMode = courses.length > 0 && courses.every((course) => course.mode === "grade_readiness");
   const sessionInProgress = Boolean(
     active && (status === "active" || status === "sending" || status === "completing")
   );
   const roomLocked = status === "starting" || sessionInProgress;
+  const latestCoachTurn = useMemo(
+    () => [...dialogue].reverse().find((entry) => entry.role === "coach")?.turn ?? active?.turn ?? null,
+    [active, dialogue]
+  );
+  const currentPhase: LearningPhase = completion ? "recap" : latestCoachTurn?.phase ?? "check_in";
 
   useEffect(() => {
     if (!selectedCourseId) return;
@@ -165,12 +215,29 @@ export function LearningWorkspace({
   }, [selectedCourseId]);
 
   useEffect(() => {
-    if (!selectedCourseId || roomLocked) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedCourseId(null);
+    if (!selectedCourseId) return;
+    const handleRoomKeyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !roomLocked) {
+        setSelectedCourseId(null);
+        return;
+      }
+      if (event.key !== "Tab" || !roomRef.current) return;
+      const focusable = Array.from(roomRef.current.querySelectorAll<HTMLElement>(
+        "button:not(:disabled), textarea:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex='-1'])"
+      ));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", handleRoomKeyboard);
+    return () => window.removeEventListener("keydown", handleRoomKeyboard);
   }, [roomLocked, selectedCourseId]);
 
   useEffect(() => {
@@ -330,15 +397,17 @@ export function LearningWorkspace({
     <section className="learning-workspace card" id="learning" aria-labelledby="learning-title">
       <header className="learning-header">
         <div>
-          <p className="eyebrow">LEARN · SEVEN INDEPENDENT TRACKS</p>
-          <h2 id="learning-title">Choose where to get ready</h2>
-          <p>Every class opens a focused AI-led session. School plans and Family actions stay separate.</p>
+          <p className="eyebrow">{gradeReadinessMode ? `GRADE ${grade} SUMMER READINESS` : "LEARN · Recommended first"}</p>
+          <h2 id="learning-title">{gradeReadinessMode ? "Choose a short summer practice" : "Pick one short practice room"}</h2>
+          <p>{gradeReadinessMode
+            ? `Your school classes aren’t synced yet. These are Homeroom-created Grade ${grade} readiness rooms—not teacher assignments.`
+            : "Three useful choices are shown first. Every connected class is still available when you want it."}</p>
         </div>
         <span className="learning-trust">Private by default · no grades</span>
       </header>
 
       <div className="learning-track-grid">
-        {courses.map((course) => {
+        {visibleCourses.map((course) => {
           const track = getLearningTrack(course.id);
           return (
             <button
@@ -351,13 +420,19 @@ export function LearningWorkspace({
             >
               <span>{course.name}</span>
               <strong>{track.mission.title}</strong>
+              <em>{recommendationReason(course)}</em>
               <small>{track.mission.suggestedMinutes} min readiness</small>
             </button>
           );
         })}
       </div>
+      {courses.length > studentSupportPolicy.attentionSupport.classChoicesBeforeExpand && (
+        <button className="learning-show-all" type="button" aria-expanded={showAllCourses} onClick={() => setShowAllCourses((current) => !current)}>
+          {showAllCourses ? "Show recommended only" : `Show all ${courses.length} ${gradeReadinessMode ? "options" : "classes"}`}
+        </button>
+      )}
 
-      {selectedTrack && selectedCourse && (
+      {selectedTrack && selectedCourse && typeof document !== "undefined" && createPortal(
         <div className="learning-room-overlay">
           <section
             className="learning-room"
@@ -372,148 +447,204 @@ export function LearningWorkspace({
                 <span aria-hidden="true">←</span> Back to classes
               </button>
               <div>
-                <span>Learning Room</span>
+                <span>Focused Learning Room</span>
                 <strong>{selectedCourse.name}</strong>
               </div>
-              <small>Private by default · no grades</small>
+              <div className="learning-room-fit">
+                <strong>Grade {emilyStudentSupportProfile.grade}</strong>
+                <small>{studentSupportPolicy.visualFirst ? "Visual-first" : "Multi-modal"} · up to {studentSupportPolicy.maxDirectionsAtOnce} steps</small>
+              </div>
             </header>
             <section className="learning-stage" aria-live="polite">
-          <div className="learning-stage-heading">
-            <div>
-              <span className="source-chip">{selectedTrack.mission.source.label}</span>
-              <h3>{selectedTrack.trackTitle}</h3>
-              <p><strong>{selectedTrack.mission.title}:</strong> {selectedTrack.mission.objective}</p>
-            </div>
-            {(status === "active" || status === "sending" || status === "completing") && (
-              <div className="learning-clock" aria-label={`${displayTimer(remainingSeconds)} remaining`}>
-                <span>{displayTimer(remainingSeconds)}</span>
-                <small>focused time left</small>
-              </div>
-            )}
-          </div>
-
-          {(status === "idle" || status === "error" || status === "starting") && !completion && (
-            <div className="learning-setup">
-              <fieldset>
-                <legend>Choose a timebox</legend>
-                <div className="learning-choice-row">
-                  {([10, 15, 20] as const).map((duration) => (
-                    <button
-                      key={duration}
-                      type="button"
-                      aria-pressed={durationMinutes === duration}
-                      onClick={() => setDurationMinutes(duration)}
-                    >{duration} min</button>
-                  ))}
-                </div>
-              </fieldset>
-              <fieldset>
-                <legend>How should Homeroom begin?</legend>
-                <div className="learning-preferences">
-                  {(Object.keys(preferenceLabels) as SupportPreference[]).map((preference) => (
-                    <label key={preference} className={supportPreference === preference ? "selected" : ""}>
-                      <input
-                        type="radio"
-                        name="support-preference"
-                        value={preference}
-                        checked={supportPreference === preference}
-                        onChange={() => setSupportPreference(preference)}
-                      />
-                      <span><strong>{preferenceLabels[preference].title}</strong><small>{preferenceLabels[preference].detail}</small></span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <button
-                className="learning-start-button"
-                disabled={status === "starting"}
-                onClick={startLearning}
-              >
-                {status === "starting" ? "Opening live coach…" : `Start ${durationMinutes}-minute session`}
-              </button>
-            </div>
-          )}
-
-          {(status === "active" || status === "sending" || status === "completing") && active && (
-            <div className="learning-live">
-              <div className="learning-live-proof">
-                <span><i /> Live GPT-5.6 Sol coach</span>
-                <small>App-owned context · OpenAI store: false</small>
-              </div>
-              <div className="learning-dialogue">
-                {dialogue.map((entry, index) => entry.role === "student" ? (
-                  <div className="learning-bubble student" key={`student-${index}`}>
-                    <span>Emily</span><p>{entry.text}</p>
-                  </div>
-                ) : (
-                  <div className="learning-bubble coach" key={`coach-${index}`}>
-                    <span>Homeroom · {entry.turn.phase.replace("_", " ")}</span>
-                    <p>{entry.turn.message}</p>
-                    <strong>{entry.turn.question}</strong>
-                    <small>{entry.turn.encouragement}</small>
-                  </div>
-                ))}
-              </div>
-              <form className="learning-response" onSubmit={sendResponse}>
-                <label htmlFor="learning-response">Your response to Homeroom</label>
+              <header className="learning-stage-heading">
                 <div>
-                  <textarea
-                    id="learning-response"
-                    aria-label="Your response to Homeroom"
-                    maxLength={500}
-                    value={responseText}
-                    disabled={status !== "active"}
-                    onChange={(event) => setResponseText(event.target.value)}
-                    placeholder="Share your thinking—not just an answer."
-                  />
-                  <button disabled={!responseText.trim() || status !== "active"} type="submit">
-                    {status === "sending" ? "Coach is thinking…" : "Send to coach"}
-                  </button>
+                  <span className="source-chip">{selectedTrack.mission.source.label}</span>
+                  <h3>{selectedTrack.trackTitle}</h3>
+                  <p>A guided workspace for planning, seeing, practicing, and explaining—not a one-question quiz.</p>
                 </div>
-              </form>
-              <div className="learning-session-actions">
-                <span>The clock guides the pace. Emily can end anytime.</span>
-                <button disabled={status === "completing" || status === "sending"} onClick={completeSession}>
-                  {status === "completing" ? "Saving recap…" : "End and save session"}
-                </button>
-              </div>
-            </div>
-          )}
+                <span className="learning-safety-note">Student thinking stays in the lead</span>
+              </header>
 
-          {completion && status === "completed" && (
-            <div className="learning-complete">
-              <span className="learning-complete-mark">✓</span>
-              <div>
-                <p className="eyebrow">SESSION SAVED · {completion.summary.objectiveStatus}</p>
-                <h4>{completion.summary.missionTitle}</h4>
-                <p>{completion.summary.objective}</p>
-                <small>{completion.summary.completedTurns} student turn{completion.summary.completedTurns === 1 ? "" : "s"} · Golden state unchanged</small>
+              <div className="learning-goal-row">
+                <LearningPriorityCard
+                  courseName={selectedCourse.name}
+                  missionTitle={selectedTrack.mission.title}
+                  objective={selectedTrack.mission.objective}
+                  nextAction={latestCoachTurn?.nextAction}
+                />
+                <LearningTimebox
+                  durationMinutes={durationMinutes}
+                  remainingSeconds={remainingSeconds}
+                  active={sessionInProgress}
+                />
               </div>
-              <div className="dialogue-deleted"><strong>Active dialogue deleted</strong><span>Only the recap and explicit preference remain.</span></div>
-            </div>
-          )}
 
-          {error && <p className="learning-error" role="alert">{error}</p>}
+              <div className="learning-focus-layout">
+                <aside className="learning-session-tools" aria-label="Session planning tools">
+                  <LearningSessionRoadmap phase={currentPhase} completed={status === "completed"} />
+                  <TaskChunkOrganizer
+                    phase={currentPhase}
+                    completed={status === "completed"}
+                    nextAction={latestCoachTurn?.nextAction}
+                  />
+                </aside>
 
-          {visibleSignals.length > 0 && (
-            <aside className="learner-memory" aria-labelledby="learner-memory-title">
-              <div>
-                <p className="eyebrow">VISIBLE · EDITABLE · COURSE-SCOPED</p>
-                <h4 id="learner-memory-title">What Homeroom remembers</h4>
+                <main className="learning-session-work">
+                  <SubjectVisualScaffold
+                    coachMode={selectedTrack.coachMode}
+                    courseName={selectedCourse.name}
+                    phase={currentPhase}
+                    visualScaffold={latestCoachTurn?.visualScaffold}
+                  />
+
+                  {(status === "idle" || status === "error" || status === "starting") && !completion && (
+                    <section className="learning-setup" aria-labelledby="learning-setup-title">
+                      <div className="learning-setup-heading">
+                        <p className="learning-micro-label">READY WHEN YOU ARE</p>
+                        <h4 id="learning-setup-title">Start with your saved learning setup</h4>
+                        <p>{durationMinutes} minutes · {preferenceLabels[supportPreference].title}. You can change either setting when you need to.</p>
+                      </div>
+                      <button
+                        className="learning-start-button"
+                        disabled={status === "starting"}
+                        onClick={startLearning}
+                      >
+                        <span aria-hidden="true">▶</span>
+                        {status === "starting" ? "Opening live coach…" : `Start ${durationMinutes}-minute session`}
+                      </button>
+                      <details className="learning-setup-options">
+                        <summary>Change session setup</summary>
+                        <div>
+                          <fieldset>
+                            <legend>Session length</legend>
+                            <div className="learning-choice-row">
+                              {([10, 15, 20] as const).map((duration) => (
+                                <button
+                                  key={duration}
+                                  type="button"
+                                  aria-pressed={durationMinutes === duration}
+                                  onClick={() => setDurationMinutes(duration)}
+                                ><strong>{duration}</strong><small>minutes</small></button>
+                              ))}
+                            </div>
+                          </fieldset>
+                          <fieldset>
+                            <legend>How Homeroom should begin</legend>
+                            <div className="learning-preferences">
+                              {(Object.keys(preferenceLabels) as SupportPreference[]).map((preference) => (
+                                <label key={preference} className={supportPreference === preference ? "selected" : ""}>
+                                  <input
+                                    type="radio"
+                                    name="support-preference"
+                                    value={preference}
+                                    checked={supportPreference === preference}
+                                    onChange={() => setSupportPreference(preference)}
+                                  />
+                                  <i aria-hidden="true">{preferenceLabels[preference].icon}</i>
+                                  <span><strong>{preferenceLabels[preference].title}</strong><small>{preferenceLabels[preference].detail}</small></span>
+                                </label>
+                              ))}
+                            </div>
+                          </fieldset>
+                        </div>
+                      </details>
+                    </section>
+                  )}
+
+                  {(status === "active" || status === "sending" || status === "completing") && active && (
+                    <section className="learning-live" aria-labelledby="learning-coach-title">
+                      <div className="learning-live-proof">
+                        <span id="learning-coach-title"><i /> Live GPT-5.6 Sol coach</span>
+                        <small>App-owned context · OpenAI store: false</small>
+                      </div>
+                      {latestCoachTurn?.executiveSkill && (
+                        <div className={`learning-executive-cue ${latestCoachTurn.executiveSkill}`}>
+                          <span aria-hidden="true">
+                            {latestCoachTurn.executiveSkill === "time_management" ? "◷" : latestCoachTurn.executiveSkill === "organization" ? "▦" : "①"}
+                          </span>
+                          <div>
+                            <small>Skill you are practicing</small>
+                            <strong>{latestCoachTurn.executiveSkill.replace("_", " ")}</strong>
+                          </div>
+                        </div>
+                      )}
+                      <div className="learning-dialogue" aria-label="Conversation with Homeroom">
+                        {dialogue.map((entry, index) => entry.role === "student" ? (
+                          <div className="learning-bubble student" key={`student-${index}`}>
+                            <span>Emily</span><p>{entry.text}</p>
+                          </div>
+                        ) : (
+                          <div className="learning-bubble coach" key={`coach-${index}`}>
+                            <span>Homeroom · {entry.turn.phase.replace("_", " ")}</span>
+                            <p>{entry.turn.message}</p>
+                            <strong>{entry.turn.question}</strong>
+                            <small>{entry.turn.encouragement}</small>
+                          </div>
+                        ))}
+                      </div>
+                      <form className="learning-response" onSubmit={sendResponse}>
+                        <label htmlFor="learning-response">Your thinking</label>
+                        <div>
+                          <textarea
+                            id="learning-response"
+                            aria-label="Your response to Homeroom"
+                            maxLength={500}
+                            value={responseText}
+                            disabled={status !== "active"}
+                            onChange={(event) => setResponseText(event.target.value)}
+                            placeholder="Explain what you notice or what step you would try next."
+                          />
+                          <button disabled={!responseText.trim() || status !== "active"} type="submit">
+                            {status === "sending" ? "Coach is thinking…" : "Share my thinking"}
+                          </button>
+                        </div>
+                      </form>
+                      <div className="learning-session-actions">
+                        <span>The clock guides the pace. You can end anytime.</span>
+                        <button disabled={status === "completing" || status === "sending"} onClick={completeSession}>
+                          {status === "completing" ? "Saving recap…" : "End and save session"}
+                        </button>
+                      </div>
+                    </section>
+                  )}
+
+                  {completion && status === "completed" && (
+                    <div className="learning-complete">
+                      <span className="learning-complete-mark">✓</span>
+                      <div>
+                        <p className="eyebrow">SESSION SAVED · {completion.summary.objectiveStatus}</p>
+                        <h4>{completion.summary.missionTitle}</h4>
+                        <p>{completion.summary.objective}</p>
+                        <small>{completion.summary.completedTurns} student turn{completion.summary.completedTurns === 1 ? "" : "s"} · Private Learning notes saved</small>
+                      </div>
+                      <div className="dialogue-deleted"><strong>Active dialogue deleted</strong><span>Only the recap and explicit preference remain.</span></div>
+                    </div>
+                  )}
+
+                  {error && <p className="learning-error" role="alert">{error}</p>}
+
+                  {visibleSignals.length > 0 && (
+                    <aside className="learner-memory" aria-labelledby="learner-memory-title">
+                      <div>
+                        <p className="eyebrow">VISIBLE · EDITABLE · COURSE-SCOPED</p>
+                        <h4 id="learner-memory-title">What Homeroom remembers</h4>
+                      </div>
+                      <div className="memory-list">
+                        {visibleSignals.map((signal) => (
+                          <article key={signal.id}>
+                            <div><strong>{signal.statement}</strong><small>{signal.why}</small></div>
+                            <button onClick={() => void deleteSignal(signal.id)}>Delete</button>
+                          </article>
+                        ))}
+                      </div>
+                    </aside>
+                  )}
+                </main>
               </div>
-              <div className="memory-list">
-                {visibleSignals.map((signal) => (
-                  <article key={signal.id}>
-                    <div><strong>{signal.statement}</strong><small>{signal.why}</small></div>
-                    <button onClick={() => void deleteSignal(signal.id)}>Delete</button>
-                  </article>
-                ))}
-              </div>
-            </aside>
-          )}
             </section>
           </section>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );

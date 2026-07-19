@@ -7,5 +7,11 @@ declare module "cloudflare:workers" {
     GOOGLE_CLASSROOM_CLIENT_ID?: string;
     GOOGLE_CLASSROOM_CLIENT_SECRET?: string;
     GOOGLE_CLASSROOM_REDIRECT_URI?: string;
+    GOOGLE_IDENTITY_REDIRECT_URI?: string;
+    AUTH_GUARDIAN_EMAILS?: string;
+    AUTH_STUDENT_EMAILS?: string;
+    RESEND_API_KEY?: string;
+    GUARDIAN_DIGEST_FROM?: string;
+    CRON_SECRET?: string;
   };
 }

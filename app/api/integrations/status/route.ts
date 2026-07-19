@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
 
 import { handleSourceStatus } from "../../../../lib/http/source-handler";
-import { FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
+import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
 import { D1SourceConnectionStore } from "../../../../lib/storage/source-connection-store";
 
-const limiter = new FixedWindowRateLimiter({ limit: 30, windowMs: 60_000 });
+const limiter = new D1FixedWindowRateLimiter(env.HOMEROOM_DB, { limit: 30, windowMs: 60_000, namespace: "integration-status" });
 
 export async function POST(request: Request) {
   if (!env.SESSION_SIGNING_SECRET || env.SESSION_SIGNING_SECRET.length < 32) {
@@ -21,6 +21,6 @@ export async function POST(request: Request) {
     signingSecret: env.SESSION_SIGNING_SECRET,
     rateLimiter: limiter,
     clientKey: request.headers.get("cf-connecting-ip") ?? "local-preview",
-    snapshot: (session) => sources.getStudentSnapshot(session.actorId)
+    snapshot: (session) => sources.getStudentSnapshot(session.studentId ?? session.actorId)
   });
 }

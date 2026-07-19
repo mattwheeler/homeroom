@@ -88,7 +88,6 @@ describe("D1 read-only source connection store", () => {
       state_hash: "a".repeat(64),
       session_id: "session_01",
       provider: "google_classroom",
-      code_verifier_ciphertext: "v1.iv.ciphertext",
       expires_at: "2026-07-18T18:10:00.000Z",
       consumed_at: null,
       created_at: "2026-07-18T18:00:00.000Z"
@@ -100,13 +99,12 @@ describe("D1 read-only source connection store", () => {
       stateHash: "a".repeat(64),
       sessionId: "session_01",
       provider: "google_classroom",
-      codeVerifierCiphertext: "v1.iv.ciphertext",
       expiresAt: "2026-07-18T18:10:00.000Z",
       createdAt: "2026-07-18T18:00:00.000Z"
     });
     await expect(store.consumeOAuthState(
       "a".repeat(64), "session_01", "2026-07-18T18:01:00.000Z"
-    )).resolves.toMatchObject({ codeVerifierCiphertext: "v1.iv.ciphertext" });
+    )).resolves.toMatchObject({ provider: "google_classroom", sessionId: "session_01" });
 
     expect(calls[0]?.values).not.toContain("state_raw_value");
     expect(calls.map((call) => call.sql)).toEqual(expect.arrayContaining([

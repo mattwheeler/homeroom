@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { PlanApprovalError } from "../domain/plan-approval";
+import { LiveDayPlanError } from "../domain/live-day-plan";
 import { ApprovalError } from "../security/approval";
 import {
   assertJsonRequest,
@@ -12,6 +13,7 @@ import {
 import type { RateLimiter } from "../security/rate-limit";
 import { SessionTokenError, verifySessionToken } from "../security/session-token";
 import type { SessionRecord, SessionStore } from "../storage/session-store";
+import type { Logger } from "../observability/logger";
 
 const approveRequest = z.object({
   actionId: z.string().regex(/^action_[a-f0-9]{24}$/),
@@ -25,6 +27,7 @@ export interface PlanApprovalHandlerDependencies {
   clientKey: string;
   approve(session: SessionRecord, input: z.infer<typeof approveRequest>): Promise<unknown>;
   now?: () => Date;
+  logger?: Logger;
 }
 
 function json(body: unknown, status: number, headers?: Record<string, string>) {
@@ -41,7 +44,7 @@ export async function handleApprovePlanV1(
   try {
     assertSameOrigin(request);
     assertJsonRequest(request);
-    if (!dependencies.rateLimiter.consume(dependencies.clientKey)) {
+    if (!(await dependencies.rateLimiter.consume(dependencies.clientKey))) {
       return json(
         { error: { code: "RATE_LIMITED", message: "Please wait a moment before trying again." } },
         429,
@@ -71,7 +74,6 @@ export async function handleApprovePlanV1(
     if (
       !session ||
       session.role !== "student" ||
-      session.actorId !== "student_emily" ||
       Date.parse(session.expiresAt) < now.getTime()
     ) {
       return json({ error: { code: "AUTH_REQUIRED", message: "Start a new Homeroom session." } }, 401);
@@ -102,7 +104,7 @@ export async function handleApprovePlanV1(
         }
       }, error.code === "INVALID_RECEIPT" ? 403 : 409);
     }
-    if (error instanceof PlanApprovalError) {
+    if (error instanceof PlanApprovalError || error instanceof LiveDayPlanError) {
       return json({
         error: { code: "APPROVAL_REJECTED", message: "This proposal is unavailable or no longer current." }
       }, 409);
@@ -116,6 +118,7 @@ export async function handleApprovePlanV1(
         error: { code: "APPROVAL_EXPIRED", message: "This approval expired. Build a fresh proposal to continue." }
       }, 409);
     }
+    dependencies.logger?.error("plan_approval_failed", error, { clientKey: dependencies.clientKey });
     return json(
       { error: { code: "SAVE_UNAVAILABLE", message: "Your plan could not be saved just yet. Please try again." } },
       500

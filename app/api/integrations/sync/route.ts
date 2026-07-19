@@ -2,11 +2,11 @@ import { env } from "cloudflare:workers";
 
 import { syncSourceConnection } from "../../../../lib/domain/source-connections";
 import { handleSourceSync } from "../../../../lib/http/source-handler";
-import { FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
+import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
 import { D1SourceConnectionStore } from "../../../../lib/storage/source-connection-store";
 
-const limiter = new FixedWindowRateLimiter({ limit: 10, windowMs: 60_000 });
+const limiter = new D1FixedWindowRateLimiter(env.HOMEROOM_DB, { limit: 10, windowMs: 60_000, namespace: "integration-sync" });
 
 export async function POST(request: Request) {
   if (

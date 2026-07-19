@@ -41,7 +41,44 @@ const priorSignal: LearnerSignal = {
   expiresAt: "2026-10-15T12:00:00.000Z"
 };
 
+const visualScaffold = {
+  kind: "sequence" as const,
+  title: "Your short learning path",
+  items: [
+    { label: "Notice", detail: "Find what matters in the prompt." },
+    { label: "Choose", detail: "Pick one useful next step." }
+  ]
+};
+
 describe("live multi-turn Learning coach", () => {
+  it("requires every coach turn to teach an executive skill with a renderable visual scaffold", () => {
+    expect(() => learningCoachTurnSchema.parse({
+      phase: "guided_practice",
+      message: "Try one step.",
+      question: "What belongs first?",
+      encouragement: "You can take this one chunk at a time.",
+      answerPolicy: "coach_not_complete"
+    })).toThrow();
+
+    expect(learningCoachTurnSchema.parse({
+      phase: "guided_practice",
+      message: "Try one step.",
+      question: "What belongs first?",
+      encouragement: "You can take this one chunk at a time.",
+      executiveSkill: "prioritization",
+      nextAction: "Choose the first chunk before solving it.",
+      visualScaffold: {
+        kind: "sequence",
+        title: "Your three-step path",
+        items: [
+          { label: "Choose", detail: "Pick the first useful step." },
+          { label: "Try", detail: "Work only that step." }
+        ]
+      },
+      answerPolicy: "coach_not_complete"
+    })).toMatchObject({ executiveSkill: "prioritization" });
+  });
+
   it("uses one strict read-only context tool and app-managed stateless context", async () => {
     const created = createLearningSession({
       session,
@@ -57,6 +94,9 @@ describe("live multi-turn Learning coach", () => {
       message: "We will use one quick example and then let you take the lead.",
       question: "When an equation changes on one side, what must happen on the other side?",
       encouragement: "There is no grade here—just a starting point.",
+      executiveSkill: "organization",
+      nextAction: "Set up the equation and identify both sides.",
+      visualScaffold,
       answerPolicy: "coach_not_complete"
     });
     const create = vi.fn()
@@ -105,6 +145,9 @@ describe("live multi-turn Learning coach", () => {
     expect(toolOutput).toContain("Homeroom readiness mission");
     expect(toolOutput).toContain(priorSignal.statement);
     expect(toolOutput).toContain('"remainingSeconds":590');
+    expect(toolOutput).toContain('"developmentalStage":"early_high_school"');
+    expect(toolOutput).toContain('"skill":"time_management"');
+    expect(toolOutput).toContain('"worked_example_or_organizer"');
     expect(traceStore.records).toEqual([expect.objectContaining({
       id: "turn_learning_01",
       stage: "learning_session",
@@ -127,6 +170,9 @@ describe("live multi-turn Learning coach", () => {
       message: "Done.",
       question: "Ready to stop?",
       encouragement: "Nice work.",
+      executiveSkill: "time_management",
+      nextAction: "Check the time remaining.",
+      visualScaffold,
       answerPolicy: "coach_not_complete"
     };
     const create = vi.fn()
@@ -168,6 +214,9 @@ describe("live multi-turn Learning coach", () => {
       message: "Right—both sides need the same change.",
       question: "What would you subtract from both sides of x + 3 = 7?",
       encouragement: "You are keeping the equation balanced.",
+      executiveSkill: "prioritization",
+      nextAction: "Choose the operation that isolates x.",
+      visualScaffold,
       answerPolicy: "coach_not_complete"
     });
     const create = vi.fn()

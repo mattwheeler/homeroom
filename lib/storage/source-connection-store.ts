@@ -17,14 +17,13 @@ export interface SourceOAuthStateRecord {
   stateHash: string;
   sessionId: string;
   provider: "google_classroom";
-  codeVerifierCiphertext: string;
   expiresAt: string;
   createdAt: string;
 }
 
 export interface SourceConnectionRecord {
   id: string;
-  studentId: "student_emily";
+  studentId: string;
   provider: SourceProvider;
   status: "active" | "error" | "revoked";
   displayName: string;
@@ -56,7 +55,6 @@ interface OAuthStateRow {
   state_hash: string;
   session_id: string;
   provider: "google_classroom";
-  code_verifier_ciphertext: string;
   expires_at: string;
   consumed_at: string | null;
   created_at: string;
@@ -64,7 +62,7 @@ interface OAuthStateRow {
 
 interface ConnectionRow {
   id: string;
-  student_id: "student_emily";
+  student_id: string;
   provider: SourceProvider;
   status: SourceConnectionRecord["status"];
   display_name: string;
@@ -108,7 +106,6 @@ function parseOAuthState(row: OAuthStateRow): SourceOAuthStateRecord {
     stateHash: row.state_hash,
     sessionId: row.session_id,
     provider: row.provider,
-    codeVerifierCiphertext: row.code_verifier_ciphertext,
     expiresAt: row.expires_at,
     createdAt: row.created_at
   };
@@ -165,15 +162,13 @@ export class D1SourceConnectionStore {
   async createOAuthState(record: SourceOAuthStateRecord): Promise<void> {
     const result = await this.database.prepare(
       `INSERT INTO source_oauth_states (
-        id, state_hash, session_id, provider, code_verifier_ciphertext,
-        expires_at, consumed_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`
+        id, state_hash, session_id, provider, expires_at, consumed_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, NULL, ?)`
     ).bind(
       record.id,
       record.stateHash,
       record.sessionId,
       record.provider,
-      record.codeVerifierCiphertext,
       record.expiresAt,
       record.createdAt
     ).run();
@@ -186,8 +181,7 @@ export class D1SourceConnectionStore {
     consumedAt: string
   ): Promise<SourceOAuthStateRecord | null> {
     const row = await this.database.prepare(
-      `SELECT id, state_hash, session_id, provider, code_verifier_ciphertext,
-        expires_at, consumed_at, created_at
+      `SELECT id, state_hash, session_id, provider, expires_at, consumed_at, created_at
       FROM source_oauth_states
       WHERE state_hash = ? AND session_id = ? AND provider = ?
         AND consumed_at IS NULL AND expires_at > ? LIMIT 1`

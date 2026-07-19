@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 
 describe("HTTP security boundary", () => {
   it("accepts an exact same-origin JSON request", () => {
-    const request = new Request("https://homeroom.example/api/demo-sessions", {
+    const request = new Request("https://homeroom.example/api/sessions", {
       method: "POST",
       headers: {
         origin: "https://homeroom.example",
@@ -24,7 +24,7 @@ describe("HTTP security boundary", () => {
   it("rejects cross-origin and non-JSON requests", () => {
     expect(() =>
       assertSameOrigin(
-        new Request("https://homeroom.example/api/demo-sessions", {
+        new Request("https://homeroom.example/api/sessions", {
           method: "POST",
           headers: { origin: "https://attacker.example" }
         })
@@ -32,14 +32,14 @@ describe("HTTP security boundary", () => {
     ).toThrow("origin");
     expect(() =>
       assertJsonRequest(
-        new Request("https://homeroom.example/api/demo-sessions", {
+        new Request("https://homeroom.example/api/sessions", {
           method: "POST",
           headers: { "content-type": "text/plain" }
         })
       )
     ).toThrow("JSON");
     expect(() =>
-      assertSameOrigin(new Request("https://homeroom.example/api/demo-sessions", { method: "POST" }))
+      assertSameOrigin(new Request("https://homeroom.example/api/sessions", { method: "POST" }))
     ).toThrow("same-origin");
   });
 

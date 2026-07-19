@@ -26,7 +26,10 @@ export class PracticeDomainError extends Error {
 }
 
 function assertStudentScope(session: SessionRecord): void {
-  if (session.role !== "student" || session.actorId !== "student_emily") {
+  const ownsStudentPrincipal = session.studentId
+    ? session.actorId === session.studentId
+    : session.actorId === "student_emily";
+  if (session.role !== "student" || !ownsStudentPrincipal) {
     throw new PracticeDomainError("PRACTICE_SCOPE_MISMATCH", "The exercise is outside this student session.");
   }
 }

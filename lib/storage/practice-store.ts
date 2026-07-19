@@ -227,7 +227,7 @@ export class D1PracticeStore implements PracticeStore {
           source_record_ids_json, state_version, evidence_json, created_at
         )
         SELECT ?, sessions.id, COALESCE(MAX(audits.sequence), 0) + 1,
-          ?, ?, NULL, ?, ?, ?, ?
+          sessions.actor_id, ?, NULL, ?, ?, ?, ?
         FROM demo_sessions AS sessions
         LEFT JOIN audit_events AS audits ON audits.session_id = sessions.id
         WHERE sessions.id = ? AND sessions.state_version = ?
@@ -240,7 +240,6 @@ export class D1PracticeStore implements PracticeStore {
       )
       .bind(
         write.auditEventId,
-        "student_emily",
         "PRACTICE_COMPLETED",
         JSON.stringify(["course_algebra_1", write.exerciseId]),
         write.nextState.stateVersion,

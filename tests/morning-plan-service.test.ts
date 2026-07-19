@@ -95,6 +95,12 @@ describe("live morning-plan generation", () => {
       call_id: "call_context",
       output: expect.stringContaining("event_band_camp_day_1")
     }));
+    expect(create.mock.calls[1][0].input).toContainEqual(expect.objectContaining({
+      output: expect.stringContaining('"developmentalStage":"early_high_school"')
+    }));
+    expect(create.mock.calls[1][0].input).toContainEqual(expect.objectContaining({
+      output: expect.stringContaining('"skill":"prioritization"')
+    }));
     expect(traceStore.records).toEqual([
       expect.objectContaining({
         id: "turn_01",

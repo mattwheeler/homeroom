@@ -2,11 +2,11 @@ import { env } from "cloudflare:workers";
 
 import { submitPracticeAttempt } from "../../../../lib/domain/practice";
 import { handlePracticeAttempt } from "../../../../lib/http/practice-handler";
-import { FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
+import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
 import { D1PracticeStore } from "../../../../lib/storage/practice-store";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
 
-const limiter = new FixedWindowRateLimiter({ limit: 12, windowMs: 60_000 });
+const limiter = new D1FixedWindowRateLimiter(env.HOMEROOM_DB, { limit: 12, windowMs: 60_000, namespace: "practice-attempt" });
 
 export async function POST(request: Request) {
   if (!env.SESSION_SIGNING_SECRET || env.SESSION_SIGNING_SECRET.length < 32) {

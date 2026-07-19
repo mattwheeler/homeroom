@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-import { createDemoSession } from "../lib/domain/demo-session";
+import { createProductSession } from "../lib/domain/product-session";
 import {
   D1SessionStore,
   type D1DatabaseLike,
@@ -24,10 +24,10 @@ class MemorySessionStore implements SessionStore {
   }
 }
 
-describe("secure demo session creation", () => {
+describe("secure product session creation", () => {
   it("creates Emily's versioned student session and signed role token", async () => {
     const store = new MemorySessionStore();
-    const result = await createDemoSession(
+    const result = await createProductSession(
       { fixtureKey: "emily_band_camp_v1", role: "student" },
       {
         store,
@@ -61,7 +61,7 @@ describe("secure demo session creation", () => {
 
   it("creates a separately scoped guardian session", async () => {
     const store = new MemorySessionStore();
-    const result = await createDemoSession(
+    const result = await createProductSession(
       { fixtureKey: "emily_band_camp_v1", role: "guardian" },
       {
         store,
@@ -79,13 +79,13 @@ describe("secure demo session creation", () => {
   it("rejects unknown fixtures and extra input", async () => {
     const store = new MemorySessionStore();
     await expect(
-      createDemoSession(
+      createProductSession(
         { fixtureKey: "real_student_data", role: "student" },
         { store, signingSecret }
       )
     ).rejects.toThrow();
     await expect(
-      createDemoSession(
+      createProductSession(
         { fixtureKey: "emily_band_camp_v1", role: "student", admin: true },
         { store, signingSecret }
       )
@@ -139,7 +139,7 @@ describe("D1 session store", () => {
     await store.create(record);
     expect(await store.findById("session_01")).toEqual(record);
     expect(calls).toHaveLength(2);
-    expect(calls[0]?.sql).toContain("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    expect(calls[0]?.sql).toContain("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     expect(calls[1]?.sql).toContain("WHERE id = ?");
     expect(calls[1]?.values).toEqual(["session_01"]);
   });

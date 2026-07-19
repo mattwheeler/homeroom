@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
 
 import { handleLearningContext } from "../../../../lib/http/learning-handler";
-import { FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
+import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
 import { D1LearningStore } from "../../../../lib/storage/learning-store";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
 
-const limiter = new FixedWindowRateLimiter({ limit: 20, windowMs: 60_000 });
+const limiter = new D1FixedWindowRateLimiter(env.HOMEROOM_DB, { limit: 20, windowMs: 60_000, namespace: "learning-context" });
 
 export async function POST(request: Request) {
   if (!env.SESSION_SIGNING_SECRET || env.SESSION_SIGNING_SECRET.length < 32) {

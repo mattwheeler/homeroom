@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import type { CourseId } from "../../lib/domain/learning-tracks";
 
@@ -84,9 +85,8 @@ export function SourceConnections({
   onCoursesChanged(courses: ConnectedCourse[]): void;
 }) {
   const [snapshot, setSnapshot] = useState<SourceSnapshot>(emptySnapshot);
-  const [status, setStatus] = useState<"idle" | "loading" | "connecting" | "syncing" | "ready" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "ready" | "error">("idle");
   const [message, setMessage] = useState("");
-  const [bandUrl, setBandUrl] = useState("");
 
   async function readStatus(resultMessage = "") {
     if (!csrfToken) return;
@@ -112,102 +112,22 @@ export function SourceConnections({
 
   useEffect(() => {
     if (!csrfToken) return;
-    const result = new URLSearchParams(window.location.search).get("source");
-    const resultMessage = result === "google-connected"
-      ? "Google Classroom connected. Your active classes are ready."
-      : result === "google-declined"
-        ? "Google Classroom access was not granted. Nothing was connected."
-        : result === "google-error"
-          ? "Google Classroom could not finish connecting. Please try again."
-          : result === "google-not-configured"
-            ? "Google Classroom credentials still need to be added locally."
-            : "";
-    const timer = window.setTimeout(() => void readStatus(resultMessage), 0);
+    const timer = window.setTimeout(() => void readStatus(), 0);
     return () => window.clearTimeout(timer);
     // `readStatus` is intentionally scoped to the current CSRF-authenticated session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [csrfToken]);
 
-  async function connectGoogle() {
-    if (!csrfToken) return;
-    setStatus("connecting");
-    setMessage("");
-    try {
-      const response = await fetch("/api/integrations/google/start", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-homeroom-csrf": csrfToken },
-        body: "{}"
-      });
-      const data = await response.json() as { authorizationUrl?: string; error?: { message?: string } };
-      if (!response.ok || !data.authorizationUrl) {
-        throw new Error(apiError(data, "Unable to begin Google authorization."));
-      }
-      const destination = new URL(data.authorizationUrl);
-      if (destination.origin !== "https://accounts.google.com") {
-        throw new Error("The Google authorization destination was not recognized.");
-      }
-      window.location.assign(destination.toString());
-    } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "Unable to begin Google authorization.");
-      setStatus("error");
-    }
-  }
-
-  async function connectBand(event: FormEvent) {
-    event.preventDefault();
-    if (!csrfToken || !bandUrl.trim()) return;
-    setStatus("connecting");
-    setMessage("");
-    try {
-      const response = await fetch("/api/integrations/band/connect", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-homeroom-csrf": csrfToken },
-        body: JSON.stringify({ calendarUrl: bandUrl.trim(), displayName: "Emily's BAND calendar" })
-      });
-      const data = await response.json() as { connected?: boolean; eventCount?: number; error?: { message?: string } };
-      if (!response.ok || !data.connected) {
-        throw new Error(apiError(data, "Unable to connect the BAND calendar."));
-      }
-      setBandUrl("");
-      setMessage(`BAND calendar connected with ${data.eventCount ?? 0} upcoming events.`);
-      await readStatus();
-    } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "Unable to connect the BAND calendar.");
-      setStatus("error");
-    }
-  }
-
-  async function sync(provider: SourceConnection["provider"]) {
-    if (!csrfToken) return;
-    setStatus("syncing");
-    setMessage("");
-    try {
-      const response = await fetch("/api/integrations/sync", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-homeroom-csrf": csrfToken },
-        body: JSON.stringify({ provider })
-      });
-      const data = await response.json() as { synced?: boolean; recordCount?: number; error?: { message?: string } };
-      if (!response.ok || !data.synced) throw new Error(apiError(data, "Unable to refresh this source."));
-      setMessage(`Read-only source refreshed with ${data.recordCount ?? 0} current records.`);
-      await readStatus();
-    } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "Unable to refresh this source.");
-      setStatus("error");
-    }
-  }
-
   const google = snapshot.connections.find((connection) => connection.provider === "google_classroom");
   const band = snapshot.connections.find((connection) => connection.provider === "band_ical");
-  const busy = status === "connecting" || status === "syncing" || status === "loading";
 
   return (
     <section className="source-connections card" id="sources" aria-labelledby="sources-title">
       <header className="sources-header">
         <div>
-          <p className="eyebrow">LIVE SCHOOL SOURCES · READ ONLY</p>
-          <h2 id="sources-title">Bring Emily&apos;s real schedule into Homeroom</h2>
-          <p>Classes and coursework come from Google Classroom. BAND events arrive through BAND&apos;s official calendar export.</p>
+          <p className="eyebrow">GUARDIAN-MANAGED · READ ONLY</p>
+          <h2 id="sources-title">Guardian-managed school sources</h2>
+          <p>Matt controls connections. Emily can use the imported classes, assignments, and events without changing source access.</p>
         </div>
         <span className="source-readonly-badge">No write permissions</span>
       </header>
@@ -215,29 +135,18 @@ export function SourceConnections({
       <div className="source-provider-grid">
         <article className="source-provider-card">
           <div className="source-provider-topline"><span>G</span><small>GOOGLE CLASSROOM</small></div>
-          <h3>{google ? google.displayName : "Connect Emily's classes"}</h3>
+          <h3>{google ? google.displayName : "Google Classroom not connected"}</h3>
           <p>Reads active classes, published coursework, due dates, and Emily&apos;s own submission state.</p>
-          {google ? (
-            <button disabled={busy} onClick={() => void sync("google_classroom")}>{status === "syncing" ? "Refreshing…" : "Refresh Classroom"}</button>
-          ) : (
-            <button disabled={busy || !csrfToken} onClick={() => void connectGoogle()}>{status === "connecting" ? "Opening Google…" : "Connect Google Classroom"}</button>
-          )}
-          <small className="source-provider-foot">{google?.lastSyncAt ? `Last read ${new Date(google.lastSyncAt).toLocaleString()}` : "OAuth · 2 narrow read-only scopes"}</small>
+          <span className="source-readonly-badge">{google ? "Connected by guardian" : "Guardian setup required"}</span>
+          <small className="source-provider-foot">{google?.lastSyncAt ? `Last read ${new Date(google.lastSyncAt).toLocaleString()}` : "Matt can connect this in the guardian workspace"}</small>
         </article>
 
         <article className="source-provider-card band-source-card">
           <div className="source-provider-topline"><span>B</span><small>BAND CALENDAR</small></div>
-          <h3>{band ? band.displayName : "Subscribe to Emily's band"}</h3>
-          <p>Paste the private iCal URL from BAND’s Calendar → Export Band Calendars screen.</p>
-          {band ? (
-            <button disabled={busy} onClick={() => void sync("band_ical")}>{status === "syncing" ? "Refreshing…" : "Refresh BAND calendar"}</button>
-          ) : (
-            <form className="band-source-form" onSubmit={connectBand}>
-              <label htmlFor="band-calendar-url">Private BAND calendar URL</label>
-              <div><input id="band-calendar-url" type="url" inputMode="url" autoComplete="off" maxLength={2_048} placeholder="webcal://…band.us/…" value={bandUrl} onChange={(event) => setBandUrl(event.target.value)} /><button disabled={busy || !bandUrl.trim()}>Connect</button></div>
-            </form>
-          )}
-          <small className="source-provider-foot">{band?.lastSyncAt ? `Last read ${new Date(band.lastSyncAt).toLocaleString()}` : "HTTPS only · band.us hosts only · redirects rechecked"}</small>
+          <h3>{band ? band.displayName : "BAND calendar not connected"}</h3>
+          <p>Shows official BAND calendar events after a guardian adds the private export URL.</p>
+          <span className="source-readonly-badge">{band ? "Connected by guardian" : "Guardian setup required"}</span>
+          <small className="source-provider-foot">{band?.lastSyncAt ? `Last read ${new Date(band.lastSyncAt).toLocaleString()}` : "Matt can connect this in the guardian workspace"}</small>
         </article>
       </div>
 
@@ -259,7 +168,7 @@ export function SourceConnections({
           </section>
         </div>
       )}
-      <p className="source-boundary">Homeroom never posts, edits, submits, grades, or RSVPs in either provider.</p>
+      <p className="source-boundary">Homeroom never posts, edits, submits, grades, or RSVPs. <Link href="/guardian#school-sources">Open guardian workspace</Link></p>
     </section>
   );
 }

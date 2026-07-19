@@ -5,12 +5,12 @@ import { createOpenAIResponsesClient } from "../../../../lib/ai/openai-client";
 import { LearningSessionError } from "../../../../lib/domain/learning-session";
 import { getLearningTrack } from "../../../../lib/domain/learning-tracks";
 import { handleLearningTurn } from "../../../../lib/http/learning-handler";
-import { FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
+import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
 import { D1AiTurnStore } from "../../../../lib/storage/ai-turn-store";
 import { D1LearningStore } from "../../../../lib/storage/learning-store";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
 
-const limiter = new FixedWindowRateLimiter({ limit: 20, windowMs: 60_000 });
+const limiter = new D1FixedWindowRateLimiter(env.HOMEROOM_DB, { limit: 20, windowMs: 60_000, namespace: "learning-turn" });
 
 export async function POST(request: Request) {
   if (

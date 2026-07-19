@@ -4,20 +4,24 @@ import { HOMEROOM_SEED_KEY, emilyFixture, mattFixture } from "./fixtures";
 import { createGoldenDemoSessionState } from "./state-machine";
 import { signSessionToken, type SessionRole } from "../security/session-token";
 import type { SessionRecord, SessionStore } from "../storage/session-store";
+import type { VerifiedIdentity } from "../security/identity-token";
+import type { PrincipalResolver } from "../storage/principal-store";
 
-const demoSessionRequest = z
+const productSessionRequest = z
   .object({
     fixtureKey: z.literal(HOMEROOM_SEED_KEY),
     role: z.enum(["student", "guardian"])
   })
   .strict();
 
-export interface DemoSessionDependencies {
+export interface ProductSessionDependencies {
   store: SessionStore;
   signingSecret: string;
   now?: () => Date;
   randomUUID?: () => string;
   randomBytes?: () => Uint8Array;
+  identity?: VerifiedIdentity;
+  principalResolver?: PrincipalResolver;
 }
 
 function base64Url(bytes: Uint8Array): string {
@@ -37,21 +41,38 @@ function actorIdFor(role: SessionRole): string {
   return role === "student" ? emilyFixture.id : mattFixture.id;
 }
 
-export async function createDemoSession(input: unknown, dependencies: DemoSessionDependencies) {
-  const request = demoSessionRequest.parse(input);
+export async function createProductSession(input: unknown, dependencies: ProductSessionDependencies) {
+  const request = productSessionRequest.parse(input);
+  if (dependencies.identity && dependencies.identity.role !== request.role) {
+    throw new Error("The verified identity does not match the requested workspace.");
+  }
   const now = (dependencies.now ?? (() => new Date()))();
   const sessionId = dependencies.randomUUID?.() ?? crypto.randomUUID();
   const csrfToken = base64Url(dependencies.randomBytes?.() ?? randomCsrfBytes());
   const expiresAtMs = now.getTime() + 2 * 60 * 60 * 1000;
   const expiresAt = new Date(expiresAtMs).toISOString();
-  // Guardian setup is part of the fixture contract, so the judged student demo
+  // Guardian setup is part of the fixture contract, so the student workspace
   // begins at the first student-controlled action rather than replaying setup.
   const state = createGoldenDemoSessionState();
+  const principal = dependencies.identity && dependencies.principalResolver
+    ? await dependencies.principalResolver.resolve(dependencies.identity)
+    : null;
   const record: SessionRecord = {
     id: sessionId,
     fixtureKey: request.fixtureKey,
-    actorId: actorIdFor(request.role),
+    actorId: principal?.principalId ?? actorIdFor(request.role),
+    ...(principal ? {
+      principalId: principal.principalId,
+      householdId: principal.householdId,
+      studentId: principal.studentId,
+      ...(principal.guardianId ? { guardianId: principal.guardianId } : {})
+    } : {}),
     role: request.role,
+    ...(dependencies.identity ? {
+      identityProvider: dependencies.identity.provider,
+      identitySubject: dependencies.identity.subject,
+      identityEmail: dependencies.identity.email
+    } : {}),
     state,
     csrfHash: await sha256Hex(csrfToken),
     expiresAt,

@@ -13,7 +13,7 @@ import type { RateLimiter } from "../security/rate-limit";
 import { SessionTokenError, verifySessionToken } from "../security/session-token";
 import type { SessionRecord, SessionStore } from "../storage/session-store";
 
-const previewSchema = z.object({}).strict();
+const previewSchema = z.object({ taskId: z.string().min(1).max(256) }).strict();
 const sendSchema = z.object({
   actionId: z.string().regex(/^action_[a-f0-9]{24}$/),
   receipt: z.string().min(20).max(256)
@@ -28,7 +28,7 @@ interface BaseDependencies {
 }
 
 export interface PreviewFamilyDependencies extends BaseDependencies {
-  preview(session: SessionRecord): Promise<unknown>;
+  preview(session: SessionRecord, request: z.infer<typeof previewSchema>): Promise<unknown>;
 }
 
 export interface SendFamilyDependencies extends BaseDependencies {
@@ -51,7 +51,7 @@ async function handle<T>(
   try {
     assertSameOrigin(request);
     assertJsonRequest(request);
-    if (!dependencies.rateLimiter.consume(dependencies.clientKey)) {
+    if (!(await dependencies.rateLimiter.consume(dependencies.clientKey))) {
       return json(
         { error: { code: "RATE_LIMITED", message: "Please wait before trying again." } },
         429,
@@ -88,7 +88,6 @@ async function handle<T>(
     if (
       !session ||
       session.role !== "student" ||
-      session.actorId !== "student_emily" ||
       Date.parse(session.expiresAt) < now.getTime()
     ) {
       return json({ error: { code: "AUTH_REQUIRED", message: "Start a new Homeroom session." } }, 401);
@@ -144,7 +143,7 @@ export function handlePreviewFamilyReminder(
   request: Request,
   dependencies: PreviewFamilyDependencies
 ) {
-  return handle(request, dependencies, previewSchema, (session) => dependencies.preview(session));
+  return handle(request, dependencies, previewSchema, (session, body) => dependencies.preview(session, body));
 }
 
 export function handleSendFamilyReminder(

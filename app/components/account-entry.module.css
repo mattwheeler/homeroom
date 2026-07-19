@@ -1,0 +1,106 @@
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  position: relative;
+  padding: 100px 24px 56px;
+  color: #17283f;
+  background:
+    radial-gradient(circle at 20% 10%, rgb(255 225 171 / 48%), transparent 24rem),
+    radial-gradient(circle at 84% 12%, rgb(211 232 219 / 74%), transparent 28rem),
+    #f8fbf8;
+}
+
+.brand {
+  position: absolute;
+  top: 28px;
+  left: 42px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand span {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: white;
+  background: #225846;
+}
+
+.brand strong { font-size: 1.35rem; letter-spacing: -.04em; }
+
+.card {
+  width: min(960px, 100%);
+  padding: clamp(30px, 5vw, 58px);
+  border: 1px solid #d8e5dd;
+  border-radius: 32px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 30px 90px rgb(31 70 55 / 12%);
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #d86650;
+  font-size: .78rem;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.card > h1 {
+  margin: 12px 0 0;
+  font-family: Georgia, serif;
+  font-size: clamp(2.4rem, 6vw, 4.4rem);
+  font-weight: 500;
+  letter-spacing: -.055em;
+}
+
+.intro {
+  max-width: 580px;
+  margin: 16px auto 0;
+  color: #64776c;
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.profiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 34px;
+  text-align: left;
+}
+
+.profiles article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 15px;
+  padding: 24px;
+  border: 1px solid #d9e4dd;
+  border-radius: 22px;
+  background: #fbfdfb;
+}
+
+.profiles article > div { min-width: 0; }
+.avatar { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 50%; color: white; font-size: 1.1rem; font-weight: 900; }
+.student .avatar { background: #ef755a; box-shadow: 0 8px 22px rgb(226 105 78 / 22%); }
+.guardian .avatar { background: #245846; box-shadow: 0 8px 22px rgb(36 88 70 / 20%); }
+.profiles small { color: #9a5d43; font-size: .7rem; font-weight: 900; letter-spacing: .12em; }
+.profiles h2 { margin: 5px 0 0; font-family: Georgia, serif; font-size: 1.55rem; font-weight: 600; }
+.profiles p { min-height: 48px; margin: 8px 0 0; color: #6c7d73; font-size: .86rem; line-height: 1.5; }
+.profiles button { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; min-height: 50px; margin-top: 8px; padding: 0 16px; border: 0; border-radius: 13px; color: white; background: #245846; cursor: pointer; font: inherit; font-size: .88rem; font-weight: 850; text-decoration: none; }
+.student button { background: #28644f; }
+.profiles button:disabled { cursor: wait; opacity: .72; }
+.boundary { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 24px 0 0; color: #708078; font-size: .82rem; }
+.error { color: #a33d35; font-size: .86rem; font-weight: 750; margin: 14px auto 0; }
+
+@media (max-width: 720px) {
+  .shell { padding: 90px 16px 30px; }
+  .brand { top: 20px; left: 20px; }
+  .profiles { grid-template-columns: 1fr; }
+  .profiles p { min-height: 0; }
+  .boundary { align-items: flex-start; text-align: left; }
+}

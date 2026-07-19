@@ -1,0 +1,28 @@
+.shell { color: #183029; padding: clamp(1.25rem, 3vw, 2.5rem); }
+.intro { align-items: end; display: flex; gap: 1rem; justify-content: space-between; margin: 0 auto 1.5rem; max-width: 68rem; }
+.intro p, .card header p { color: #b05d42; font-size: .8rem; font-weight: 800; letter-spacing: .14em; margin: 0 0 .45rem; }
+.intro h2 { font-family: Georgia, serif; font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1.05; margin: 0; }
+.intro div > span { color: #63766f; display: block; margin-top: .65rem; }
+.proof { background: #eaf4ee; border: 1px solid #cde0d5; border-radius: 999px; color: #316550; flex: 0 0 auto; font-size: .82rem; font-weight: 800; padding: .65rem .85rem; }
+.lists { display: grid; gap: 1.25rem; margin: auto; max-width: 68rem; }
+.card, .empty { background: #fff; border: 1px solid #dce7e2; border-radius: 1.4rem; box-shadow: 0 16px 45px rgba(31, 66, 55, .08); }
+.card > header { align-items: center; border-bottom: 1px solid #e4ece8; display: flex; gap: 1rem; justify-content: space-between; padding: 1.25rem 1.4rem; }
+.card h3 { font-family: Georgia, serif; font-size: 1.45rem; margin: 0; }
+.card header a { border: 1px solid #bfd2c8; border-radius: .7rem; color: #245d4b; font-size: .8rem; font-weight: 800; padding: .65rem .75rem; text-decoration: none; }
+.card ul { display: grid; gap: .55rem; list-style: none; margin: 0; padding: 1rem; }
+.card li button { align-items: center; background: #f8faf9; border: 1px solid #e2ebe6; border-radius: .9rem; color: inherit; cursor: pointer; display: flex; gap: .8rem; min-height: 58px; padding: .75rem; text-align: left; width: 100%; }
+.card li i { align-items: center; border: 2px solid #9db6aa; border-radius: .4rem; color: white; display: flex; flex: 0 0 auto; height: 1.5rem; justify-content: center; width: 1.5rem; }
+.card li span { display: grid; gap: .2rem; }
+.card li strong { font-size: .95rem; }
+.card li small, .card footer small { color: #71837c; font-size: .78rem; }
+.card li.checked button { background: #eaf4ee; border-color: #b9d4c6; }
+.card li.checked i { background: #2e6b55; border-color: #2e6b55; }
+.card li.checked strong { text-decoration: line-through; text-decoration-color: #80958c; }
+.card footer { align-items: center; background: #f7faf8; border-radius: 0 0 1.4rem 1.4rem; border-top: 1px solid #e4ece8; display: flex; gap: 1rem; justify-content: space-between; padding: .9rem 1.25rem; }
+.card footer span { color: #315d4d; font-size: .82rem; font-weight: 800; }
+.card footer small { max-width: 34rem; text-align: right; }
+.empty { margin: 3rem auto; max-width: 36rem; padding: 2.5rem; text-align: center; }
+.empty > span { color: #2e6b55; font-size: 2.5rem; }
+.empty h3 { font-family: Georgia, serif; font-size: 1.5rem; margin: .8rem 0 .4rem; }
+.empty p { color: #687b74; line-height: 1.6; margin: 0; }
+@media (max-width: 700px) { .intro, .card > header, .card footer { align-items: flex-start; flex-direction: column; } .card footer small { text-align: left; } }

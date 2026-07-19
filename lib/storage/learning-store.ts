@@ -53,7 +53,7 @@ export interface LearningStore {
 interface LearningSessionRow {
   id: string;
   demo_session_id: string;
-  student_id: "student_emily";
+  student_id: string;
   course_id: CourseId;
   mission_id: string;
   objective_id: string;
@@ -270,7 +270,7 @@ export class D1LearningStore implements LearningStore {
       write.signal.studentId,
       write.signal.id,
       "signal_saved",
-      "student_emily",
+      write.signal.studentId,
       JSON.stringify({
         evidenceKind: write.signal.evidenceKind,
         learningSessionId: write.learningSessionId,
@@ -353,7 +353,7 @@ export class D1LearningStore implements LearningStore {
     ).bind(
       eventId,
       "signal_deleted",
-      "student_emily",
+      studentId,
       JSON.stringify({ reason: "student_deleted" }),
       deletedAt,
       signalId,

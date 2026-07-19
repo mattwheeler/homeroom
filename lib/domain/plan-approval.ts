@@ -72,7 +72,7 @@ export async function stagePlanV1Proposal(input: {
   now?: () => Date;
   nonce?: string;
 }) {
-  if (input.session.role !== "student" || input.session.actorId !== "student_emily") {
+  if (input.session.role !== "student") {
     throw new PlanApprovalError("APPROVAL_SCOPE_MISMATCH", "The proposal is outside this student session.");
   }
   const validatedPlan = morningPlanSchema.parse(input.plan);
@@ -123,7 +123,6 @@ export async function approvePlanV1(input: {
   if (!record) throw new PlanApprovalError("APPROVAL_NOT_FOUND", "The approval request was not found.");
   if (
     input.session.role !== "student" ||
-    input.session.actorId !== "student_emily" ||
     record.pending.sessionId !== input.session.id ||
     record.pending.actor !== input.session.actorId ||
     record.pending.actionType !== "APPROVE_PLAN_V1"
@@ -185,7 +184,7 @@ export async function stagePlanV2Proposal(input: {
   now?: () => Date;
   nonce?: string;
 }) {
-  if (input.session.role !== "student" || input.session.actorId !== "student_emily") {
+  if (input.session.role !== "student") {
     throw new PlanApprovalError("APPROVAL_SCOPE_MISMATCH", "The proposal is outside this student session.");
   }
   const validatedPlan = morningPlanSchema.parse(input.plan);
@@ -236,7 +235,6 @@ export async function approvePlanV2(input: {
   if (!record) throw new PlanApprovalError("APPROVAL_NOT_FOUND", "The approval request was not found.");
   if (
     input.session.role !== "student" ||
-    input.session.actorId !== "student_emily" ||
     record.pending.sessionId !== input.session.id ||
     record.pending.actor !== input.session.actorId ||
     record.pending.actionType !== "APPROVE_PLAN_V2"
