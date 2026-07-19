@@ -78,11 +78,13 @@
 
 .scrollArea {
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
 .content {
   width: min(1380px, 100%);
+  min-width: 0;
   margin: 0 auto;
   padding: 28px clamp(20px, 4vw, 64px) 52px;
 }
@@ -152,7 +154,7 @@
 
 .layout {
   display: grid;
-  grid-template-columns: 285px minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 285px) minmax(0, 1fr);
   align-items: start;
   gap: 16px;
   margin-top: 23px;
@@ -163,6 +165,12 @@
   min-width: 0;
   display: grid;
   gap: 14px;
+}
+
+.focusRail > *,
+.workArea > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .focusRail {
@@ -186,6 +194,9 @@
 .progressCard,
 .timerCard,
 .sourceCard {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
   padding: 17px;
 }
 
@@ -361,12 +372,11 @@
 }
 
 .sourceCard small {
-  overflow: hidden;
   margin-top: 3px;
   color: #7b8981;
   font-size: .7rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .sourceCard a {
@@ -681,9 +691,13 @@
   padding: 10px 15px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1220px) {
   .layout { grid-template-columns: 1fr; }
-  .focusRail { grid-template-columns: repeat(2, minmax(0, 1fr)); position: static; }
+  .focusRail { grid-template-columns: repeat(3, minmax(0, 1fr)); position: static; }
+}
+
+@media (max-width: 900px) {
+  .focusRail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sourceCard { grid-column: 1 / -1; }
   .actions { align-items: stretch; flex-direction: column; }
   .actions > div:last-child { justify-content: flex-end; }

@@ -99,6 +99,8 @@ describe("StudentTaskRoom", () => {
     expect(html).toContain("0 of 3 chunks complete");
     expect(html).toContain("Homeroom never submits or changes this assignment");
     expect(html).toContain("Your focus will be saved so Homeroom can help you return without judgment.");
+    expect(html).toContain('data-testid="task-room-focus-rail"');
+    expect(html).toContain('data-testid="task-room-work-area"');
   });
 
   it("shows the course Learning room as a secondary action only when it can be opened", () => {

@@ -7,8 +7,11 @@
   display: inline-flex;
   flex-direction: column;
   gap: .15rem;
-  max-width: 19rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: .55rem .7rem;
+  overflow-wrap: anywhere;
 }
 
 .guard strong { font-size: .76rem; }

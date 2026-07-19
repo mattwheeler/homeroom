@@ -24,18 +24,26 @@ type ConversationTurn =
       mode: "live" | "fallback" | "safety";
     };
 
-const focusChoices: Array<{ id: FocusState; label: string; icon: string }> = [
-  { id: "ready", label: "Ready", icon: "●" },
-  { id: "scattered", label: "A little scattered", icon: "◌" },
-  { id: "low_energy", label: "Low energy", icon: "◒" }
+const focusChoices: Array<{ id: FocusState; label: string; icon: string; prompt: string }> = [
+  {
+    id: "ready",
+    label: "Ready",
+    icon: "●",
+    prompt: "I am feeling confident and ready to get started today."
+  },
+  {
+    id: "scattered",
+    label: "A little scattered",
+    icon: "◌",
+    prompt: "I am feeling a little scattered today, and I am not quite sure where to begin."
+  },
+  {
+    id: "low_energy",
+    label: "Low energy",
+    icon: "◒",
+    prompt: "I have low energy today, and it is affecting my ability to focus."
+  }
 ];
-
-function supportiveLine(value: FocusState | null): string {
-  if (value === "scattered") return "That’s okay. Homeroom will keep only one first step in view.";
-  if (value === "low_energy") return "Thanks for saying so. A short start is enough for now.";
-  if (value === "ready") return "Great. Start small, then decide what comes next.";
-  return "Optional—choose one if it helps Homeroom understand your energy.";
-}
 
 function ChoiceCard({ choice, onAction, recommended = false }: {
   choice: StudentCheckInChoice;
@@ -153,6 +161,15 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
     return "Start the recommended step";
   }
 
+  function chooseFocusStarter(choice: (typeof focusChoices)[number]) {
+    const isSelected = focus === choice.id;
+    setFocus(isSelected ? null : choice.id);
+    setMessage((current) => {
+      if (isSelected) return current === choice.prompt ? "" : current;
+      return choice.prompt;
+    });
+  }
+
   return (
     <section className={styles.checkIn} aria-labelledby="student-daily-check-in-title">
       <div className={styles.heading}>
@@ -169,7 +186,7 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
       <section className={styles.aiCheckIn} aria-labelledby="student-ai-check-in-title">
         <header>
           <div><p>PRIVATE AI COACHING</p><h2 id="student-ai-check-in-title">Talk it through with Homeroom</h2></div>
-          {conversation.length > 0 && <button type="button" onClick={() => { setConversation([]); setAiError(""); }}>Start over</button>}
+          {conversation.length > 0 && <button type="button" onClick={() => { setConversation([]); setFocus(null); setMessage(""); setAiError(""); }}>Start over</button>}
         </header>
         {conversation.length > 0 && (
           <div className={styles.conversation} role="log" aria-live="polite" aria-label="Conversation with Homeroom">
@@ -190,7 +207,25 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
         )}
         <form onSubmit={(event) => { event.preventDefault(); void sendCheckIn(); }}>
           <label htmlFor="student-check-in-message">What would you like help with right now?</label>
-          <p>You can type first or add an optional focus signal below. Your conversation stays in this browser session.</p>
+          <p>Choose a starter to edit, or write your own message. Homeroom offers school-day coaching and motivation, and your conversation stays in this browser session.</p>
+          <fieldset className={styles.focusStarters}>
+            <legend>Optional conversation starters</legend>
+            <div>
+              {focusChoices.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  aria-label={choice.label}
+                  aria-pressed={focus === choice.id}
+                  onClick={() => chooseFocusStarter(choice)}
+                >
+                  <span aria-hidden="true">{choice.icon}</span>
+                  <strong>{choice.label}</strong>
+                  <small>{choice.prompt}</small>
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <textarea
             id="student-check-in-message"
             value={message}
@@ -204,21 +239,6 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
           {aiError && <p className={styles.aiError} role="alert">{aiError}</p>}
         </form>
       </section>
-
-      <fieldset className={styles.focus}>
-        <legend>How is your focus right now? (optional)</legend>
-        <div>
-          {focusChoices.map((choice) => (
-            <button
-              key={choice.id}
-              type="button"
-              aria-pressed={focus === choice.id}
-              onClick={() => setFocus((current) => current === choice.id ? null : choice.id)}
-            ><span aria-hidden="true">{choice.icon}</span>{choice.label}</button>
-          ))}
-        </div>
-        <p aria-live="polite">{supportiveLine(focus)}</p>
-      </fieldset>
 
       <ChoiceCard choice={checkIn.recommended} onAction={onAction} recommended />
 

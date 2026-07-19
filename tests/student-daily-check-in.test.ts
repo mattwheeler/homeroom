@@ -54,7 +54,7 @@ describe("bounded evidence-backed student check-in", () => {
     expect(checkIn.alternatives.length).toBeLessThanOrEqual(3);
   });
 
-  it("lets Emily talk immediately, labels focus as optional, and progressively discloses alternatives", () => {
+  it("lets Emily talk immediately, offers editable focus starters, and progressively discloses alternatives", () => {
     const html = renderToStaticMarkup(createElement(StudentDailyCheckIn, {
       studentName: "Emily",
       projection: navigationProjection,
@@ -62,15 +62,18 @@ describe("bounded evidence-backed student check-in", () => {
     }));
 
     expect(html).toContain("Good morning, Emily.");
-    expect(html).toContain("How is your focus right now? (optional)");
+    expect(html).toContain("Optional conversation starters");
     expect(html).toContain("Ready");
     expect(html).toContain("A little scattered");
     expect(html).toContain("Low energy");
+    expect(html).toContain("I am feeling confident and ready to get started today.");
+    expect(html).toContain("I am feeling a little scattered today, and I am not quite sure where to begin.");
+    expect(html).toContain("I have low energy today, and it is affecting my ability to focus.");
     expect(html).toContain("Recommended next step");
     expect(html).toContain("Show 3 other choices");
     expect(html).toContain("<details");
     expect(html).toContain("What would you like help with right now?");
-    expect(html).toContain("You can type first or add an optional focus signal");
+    expect(html).toContain("Choose a starter to edit, or write your own message");
     expect(html).toContain("Talk to Homeroom");
     expect(html).not.toContain("disabled=\"\" placeholder=\"Choose how your focus feels first.");
   });

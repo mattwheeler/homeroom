@@ -8,13 +8,6 @@
 .sourceSignal strong, .sourceSignal small { display: block; }
 .sourceSignal strong { font-size: .72rem; }
 .sourceSignal small { margin-top: 2px; color: #678174; font-size: .62rem; }
-.focus { margin: 26px 0 18px; padding: 0; border: 0; }
-.focus legend { margin-bottom: 9px; color: #395447; font-size: .8rem; font-weight: 850; }
-.focus > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.focus button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 9px 12px; border: 1px solid #d3e0d8; border-radius: 12px; color: #567066; background: white; font: inherit; font-size: .8rem; font-weight: 760; cursor: pointer; }
-.focus button[aria-pressed="true"] { border-color: #3d735e; color: #245640; background: #eaf4ed; box-shadow: inset 0 0 0 1px #3d735e; }
-.focus button span { font-size: .68rem; }
-.focus > p { min-height: 19px; margin: 8px 0 0; color: #718178; font-size: .72rem; }
 .aiCheckIn { margin: 26px 0 18px; padding: clamp(16px, 3vw, 22px); border: 1px solid #cdded3; border-radius: 20px; background: linear-gradient(145deg, #f8fcf8 0%, #fff 58%); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .75); }
 .aiCheckIn > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 .aiCheckIn > header p { margin: 0 0 5px; color: #d26751; font-size: .62rem; font-weight: 900; letter-spacing: .14em; }
@@ -22,6 +15,15 @@
 .aiCheckIn > header > button { padding: 7px 9px; border: 1px solid #ccdcd2; border-radius: 9px; color: #527064; background: white; font: inherit; font-size: .68rem; font-weight: 780; cursor: pointer; }
 .aiCheckIn form > label { display: block; margin: 2px 0 5px; color: #2e5141; font-size: .82rem; font-weight: 850; }
 .aiCheckIn form > p { margin: 0 0 10px; color: #708078; font-size: .69rem; line-height: 1.45; }
+.focusStarters { margin: 0 0 12px; padding: 0; border: 0; }
+.focusStarters legend { margin-bottom: 8px; color: #526d60; font-size: .68rem; font-weight: 820; }
+.focusStarters > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.focusStarters button { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start; gap: 3px 7px; padding: 10px 11px; border: 1px solid #d1ded6; border-radius: 12px; color: #506b5e; text-align: left; background: white; font: inherit; cursor: pointer; }
+.focusStarters button[aria-pressed="true"] { border-color: #3d735e; color: #245640; background: #eaf4ed; box-shadow: inset 0 0 0 1px #3d735e; }
+.focusStarters button > span { grid-row: 1 / span 2; padding-top: 2px; font-size: .62rem; }
+.focusStarters button strong { font-size: .72rem; }
+.focusStarters button small { color: #718178; font-size: .62rem; line-height: 1.35; }
+.focusStarters button[aria-pressed="true"] small { color: #557164; }
 .aiCheckIn textarea { box-sizing: border-box; width: 100%; resize: vertical; padding: 12px 13px; border: 1px solid #c4d7ca; border-radius: 13px; color: #263e34; background: white; font: inherit; font-size: .82rem; line-height: 1.5; }
 .aiCheckIn textarea:focus { outline: 3px solid rgba(49, 106, 81, .16); border-color: #3e745e; }
 .aiCheckIn textarea:disabled { background: #f1f4f2; }
@@ -68,7 +70,7 @@
 @media (max-width: 720px) {
   .heading { display: block; }
   .sourceSignal { width: fit-content; margin-top: 16px; }
-  .focus > div { grid-template-columns: 1fr; }
+  .focusStarters > div { grid-template-columns: 1fr; }
   .choice { grid-template-columns: auto minmax(0, 1fr); }
   .choice > strong, .choice > button { grid-column: 2; width: fit-content; }
 }

@@ -160,6 +160,10 @@ test("Emily can use the complete calm student journey", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Today" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening), Emily\./ })).toBeVisible();
   await expect(page.getByText("No guessed deadlines or events")).toBeVisible();
+  await page.getByRole("button", { name: "Low energy" }).click();
+  await expect(page.getByLabel("What would you like help with right now?")).toHaveValue("I have low energy today, and it is affecting my ability to focus.");
+  await page.getByRole("button", { name: "Low energy" }).click();
+  await expect(page.getByLabel("What would you like help with right now?")).toHaveValue("");
   await page.getByLabel("What would you like help with right now?").fill("I know what to do, but I cannot get started.");
   await page.getByRole("button", { name: "Talk to Homeroom" }).click();
   await expect(page.getByText("You know the task; the hard part is crossing the starting line.")).toBeVisible();
@@ -176,6 +180,12 @@ test("Emily can use the complete calm student journey", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Your 3-step checklist" })).toBeVisible();
   await expect(page.getByText("Homeroom never submits or changes this assignment.")).toBeVisible();
   const taskRoom = page.getByRole("dialog", { name: "Band Camp Packing Checklist" });
+  await page.setViewportSize({ width: 1180, height: 900 });
+  const railBox = await taskRoom.getByTestId("task-room-focus-rail").boundingBox();
+  const workBox = await taskRoom.getByTestId("task-room-work-area").boundingBox();
+  expect(railBox).not.toBeNull();
+  expect(workBox).not.toBeNull();
+  expect(railBox!.y + railBox!.height).toBeLessThanOrEqual(workBox!.y + 1);
   await expect(taskRoom.getByRole("checkbox")).toHaveCount(3);
   for (const checkbox of await taskRoom.getByRole("checkbox").all()) await checkbox.check();
   await taskRoom.getByRole("button", { name: "Finish focus block" }).click();

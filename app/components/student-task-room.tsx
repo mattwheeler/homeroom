@@ -294,7 +294,7 @@ export function StudentTaskRoomContent({
             </section>
           ) : (
             <div className={styles.layout}>
-              <aside className={styles.focusRail} aria-label="Task progress and timer">
+              <aside className={styles.focusRail} aria-label="Task progress and timer" data-testid="task-room-focus-rail">
                 <section className={styles.progressCard}>
                   <div className={styles.sectionLabel}><span aria-hidden="true">✓</span><strong>Your progress</strong></div>
                   <strong>{completedCount} of {priority.chunks.length} chunks complete</strong>
@@ -346,7 +346,7 @@ export function StudentTaskRoomContent({
                 </section>
               </aside>
 
-              <section className={styles.workArea}>
+              <section className={styles.workArea} data-testid="task-room-work-area">
                 <section className={styles.directions} aria-labelledby="task-directions-heading">
                   <div>
                     <p>WHAT THIS ASSIGNMENT IS</p>
