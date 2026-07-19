@@ -37,17 +37,6 @@ const revision = {
 };
 
 test("Emily independently uses learning, family help, and a live day plan", async ({ page }) => {
-  await page.route("**/api/sessions", async (route) => {
-    await route.fulfill({
-      status: 201,
-      contentType: "application/json",
-      body: JSON.stringify({
-        sessionId: "session_01",
-        csrfToken: "csrf-test",
-        profile: { name: "Emily", grade: 9 }
-      })
-    });
-  });
   await page.route("**/api/integrations/status", async (route) => {
     expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
     await route.fulfill({
@@ -61,12 +50,15 @@ test("Emily independently uses learning, family help, and a live day plan", asyn
       })
     });
   });
-  await page.route("**/api/student/projection", async (route) => {
-    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-test");
+  await page.route("**/api/student/bootstrap", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
+        csrfToken: "csrf-test",
+        profile: { name: "Emily", grade: 9 },
+        session: { reused: false, expiresAt: "2026-07-18T14:00:00.000Z" },
+        projection: {
         generatedAt: "2026-07-18T12:00:00.000Z",
         context: { localDate: "2026-07-18", age: 14, grade: 9, timeZone: "America/Chicago", scaffoldLevel: "guided_independence", visualFirst: true },
         sourceSummary: { courseCount: 7, actionableCourseworkCount: 14, completedCourseworkCount: 0, eventCount: 0, connections: [] },
@@ -120,6 +112,7 @@ test("Emily independently uses learning, family help, and a live day plan", asyn
           externalId, name, section: null, subject: null, trackCourseId, alternateLink: null,
           source: { provider: "google_classroom", recordType: "course", externalId, sourceUpdatedAt: null }
         }))
+        }
       })
     });
   });
@@ -556,8 +549,7 @@ test("Emily independently uses learning, family help, and a live day plan", asyn
   });
 
   await page.goto("/student");
-  await expect(page.getByRole("heading", { name: "Grade 9 summer readiness is ready." })).toBeVisible();
-  await page.getByRole("button", { name: "Show me my first step" }).click();
+  await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening), Emily\./ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "One thing at a time." })).toBeVisible();
 
   await page.getByRole("tab", { name: "Learn" }).click();

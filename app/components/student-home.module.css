@@ -38,6 +38,15 @@
 .workspace { min-height: calc(100dvh - 138px); flex: 1; padding: clamp(34px, 6vw, 72px) 24px 70px; }
 .workspace :global(.learning-workspace) { width: min(1040px, 100%); margin: 0 auto; }
 .loading { width: min(920px, 100%); margin: 0 auto; padding: 28px; border: 1px solid #dbe5de; border-radius: 18px; color: #65786e; background: #f7faf8; text-align: center; }
+.todayLifecycle { display: grid; place-items: center; width: min(680px, 100%); min-height: 380px; margin: 0 auto; padding: 42px; border: 1px solid #d6e3da; border-radius: 28px; background: radial-gradient(circle at 50% 10%, #eef7f0 0, white 62%); box-shadow: 0 20px 60px rgba(31, 70, 54, .08); text-align: center; }
+.lifecyclePulse { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 20px; color: white; background: #2a634e; font-size: 1.3rem; box-shadow: 0 0 0 10px #e6f1e9; }
+.todayLifecycle > p { margin: 22px 0 6px; color: #d36a54; font-size: .68rem; font-weight: 900; letter-spacing: .15em; }
+.todayLifecycle h1 { margin: 0; color: #1d3449; font: 500 clamp(2rem, 5vw, 3.1rem)/1.05 Georgia, serif; letter-spacing: -.045em; }
+.todayLifecycle > span:not(.lifecyclePulse) { max-width: 480px; margin-top: 14px; color: #6b7d73; line-height: 1.55; }
+.todayLifecycle > div { display: flex; align-items: center; gap: 10px; margin-top: 24px; }
+.todayLifecycle button, .todayLifecycle a { min-height: 42px; padding: 11px 14px; border-radius: 12px; font: inherit; font-size: .78rem; font-weight: 820; text-decoration: none; cursor: pointer; }
+.todayLifecycle button { border: 0; color: white; background: #275e49; }
+.todayLifecycle a { border: 1px solid #c9d9cf; color: #416353; background: white; }
 .completionNotice { width: min(920px, 100%); margin: 0 auto 16px; padding: 11px 14px; border: 1px solid #cee1d4; border-radius: 13px; color: #35624f; background: #ecf6ef; font-size: .75rem; text-align: center; }
 .plannerOverlay { position: fixed; inset: 0; z-index: 120; background: #f4f8f4; }
 .plannerOverlay[hidden] { display: none; }

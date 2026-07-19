@@ -1,0 +1,15 @@
+.guard {
+  align-items: flex-start;
+  background: #f4f7f5;
+  border: 1px solid #d8e3dd;
+  border-radius: .75rem;
+  color: #3a5e50;
+  display: inline-flex;
+  flex-direction: column;
+  gap: .15rem;
+  max-width: 19rem;
+  padding: .55rem .7rem;
+}
+
+.guard strong { font-size: .76rem; }
+.guard small { color: #6f8079; font-size: .68rem; line-height: 1.35; }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { StudentSourceProjection } from "../../lib/domain/student-source-projection";
+import { StudentOutboundGuard } from "./student-outbound-guard";
 import styles from "./student-supplies.module.css";
 
 export function StudentSupplies({ projection }: { projection: StudentSourceProjection }) {
@@ -36,10 +37,12 @@ export function StudentSupplies({ projection }: { projection: StudentSourceProje
       ) : (
         <div className={styles.lists}>
           {lists.map((list) => (
-            <article className={styles.card} key={list.sourceUrl}>
+            <article className={styles.card} key={list.id}>
               <header>
                 <div><p>From your school’s official list</p><h3>{list.title}</h3></div>
-                <a href={list.sourceUrl} target="_blank" rel="noreferrer">Open official page ↗</a>
+                {list.outbound.available && (
+                  <StudentOutboundGuard policy={list.outbound.policy} resourceLabel="official supply page" />
+                )}
               </header>
               <ul>
                 {list.items.map((item) => {

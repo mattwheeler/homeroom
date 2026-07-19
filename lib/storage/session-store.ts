@@ -25,6 +25,10 @@ export interface SessionStore {
   findById(id: string): Promise<SessionRecord | null>;
 }
 
+export interface ReusableSessionStore extends SessionStore {
+  updateCsrfHash(id: string, csrfHash: string, updatedAt: string): Promise<void>;
+}
+
 export interface D1RunResult {
   success: boolean;
   meta?: { changes?: number };
@@ -70,7 +74,7 @@ export class SessionStoreError extends Error {
   }
 }
 
-export class D1SessionStore implements SessionStore {
+export class D1SessionStore implements ReusableSessionStore {
   constructor(private readonly database: D1DatabaseLike) {}
 
   async create(record: SessionRecord): Promise<void> {
@@ -140,5 +144,15 @@ export class D1SessionStore implements SessionStore {
       record.identityEmail = row.identity_email;
     }
     return record;
+  }
+
+  async updateCsrfHash(id: string, csrfHash: string, updatedAt: string): Promise<void> {
+    const result = await this.database
+      .prepare("UPDATE demo_sessions SET csrf_hash = ?, updated_at = ? WHERE id = ?")
+      .bind(csrfHash, updatedAt, id)
+      .run();
+    if (!result.success || result.meta?.changes === 0) {
+      throw new SessionStoreError("Unable to rotate the session request token.");
+    }
   }
 }

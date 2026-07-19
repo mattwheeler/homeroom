@@ -2,7 +2,8 @@
 .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .head p { color: #c75b43; font-size: .76rem; font-weight: 800; letter-spacing: .16em; margin: 0 0 6px; }
 .head h2 { color: #183a2e; font-family: Georgia, serif; font-size: 1.75rem; margin: 0; }
-.head button, .card button { border: 1px solid #9ebcab; border-radius: 12px; background: white; color: #205b47; font-weight: 800; min-height: 42px; padding: 0 16px; }
+.head button, .card button { border: 1px solid #9ebcab; border-radius: 12px; background: white; color: #205b47; font-weight: 800; min-height: 42px; padding: 0 16px; cursor: pointer; }
+.head button:disabled, .card button:disabled { opacity: .62; cursor: wait; }
 .summary { color: #60766d; margin: 0; }
 .list { display: grid; gap: 10px; }
 .card { display: grid; grid-template-columns: 1fr auto; gap: 12px; border: 1px solid #d8e4dd; border-radius: 16px; background: white; padding: 16px; }
@@ -11,4 +12,13 @@
 .card small { color: #7a8e85; }
 .read { opacity: .68; }
 .digest { white-space: pre-wrap; border-left: 4px solid #f27a60; background: #fff7ef; border-radius: 8px; padding: 14px; color: #415b51; }
+.deliveryNotice { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 12px; padding: 16px; border: 1px solid; border-radius: 16px; box-shadow: 0 8px 22px rgba(26, 60, 47, .08); }
+.deliveryNotice > span:last-child { display: flex; flex-direction: column; gap: 4px; }
+.deliveryNotice strong { font-size: .95rem; }
+.deliveryNotice small { font-size: .75rem; line-height: 1.45; }
+.deliveryMark { display: grid; place-items: center; width: 30px; height: 30px; color: white; border-radius: 50%; font-weight: 900; }
+.deliverySuccess { color: #164f3a; background: #eaf7ef; border-color: #a8d4ba; }
+.deliverySuccess .deliveryMark { background: #287357; }
+.deliveryFailure { color: #863b31; background: #fff0ed; border-color: #efb6ac; }
+.deliveryFailure .deliveryMark { background: #b94e40; }
 @media (max-width: 760px) { .head, .card { grid-template-columns: 1fr; display: grid; } }

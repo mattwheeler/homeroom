@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import type { CourseId } from "../../lib/domain/learning-tracks";
 import type { StudentSourceProjection } from "../../lib/domain/student-source-projection";
 import styles from "./student-task-room.module.css";
+import { StudentOutboundGuard } from "./student-outbound-guard";
 
 export type StudentTaskPriority = StudentSourceProjection["priorities"][number];
 
@@ -339,8 +340,8 @@ export function StudentTaskRoomContent({
                   <p>Original source</p>
                   <strong>{providerLabel(priority.source.provider)}</strong>
                   <small>Homeroom never submits or changes this assignment.</small>
-                  {priority.sourceLink && (
-                    <a href={priority.sourceLink} target="_blank" rel="noreferrer">Open the original assignment ↗</a>
+                  {priority.outbound?.available && (
+                    <StudentOutboundGuard policy={priority.outbound.policy} resourceLabel="original assignment" />
                   )}
                 </section>
               </aside>
@@ -350,7 +351,9 @@ export function StudentTaskRoomContent({
                   <div>
                     <p>WHAT THIS ASSIGNMENT IS</p>
                     <h2 id="task-directions-heading">Directions</h2>
-                    <strong>{priority.directions || "The school source did not include written directions. Open the original assignment before you begin."}</strong>
+                    <strong>{priority.directions || (priority.outbound?.policy === "guardian_approval"
+                      ? "The school source did not include written directions. Ask your guardian to help review the original assignment before you begin."
+                      : "The school source did not include written directions. External source access is blocked, so pause and ask your guardian or teacher what to do next.")}</strong>
                   </div>
                   <ul aria-label="Why Homeroom recommended this assignment">
                     {priority.rationale.signals.map((signal) => <li key={signal}>{signal}</li>)}

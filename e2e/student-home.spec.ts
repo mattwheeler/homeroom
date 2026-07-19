@@ -46,7 +46,6 @@ projection.sourceSummary.schoolConnections = [
     provider: "school_calendar",
     status: "active",
     displayName: "Comal ISD official calendar",
-    sourceUrl: "https://www.comalisd.org/apps/pages/calendars",
     lastSyncAt: "2026-08-16T12:00:00.000Z",
     lastErrorCode: null
   },
@@ -55,7 +54,6 @@ projection.sourceSummary.schoolConnections = [
     provider: "school_supplies",
     status: "active",
     displayName: "Pieper High School Algebra I supplies",
-    sourceUrl: "https://phs.comalisd.org/apps/pages/index.jsp?pREC_ID=2692760&type=u&uREC_ID=2803759",
     lastSyncAt: "2026-08-16T12:00:00.000Z",
     lastErrorCode: null
   }
@@ -81,10 +79,11 @@ projection.calendar?.items.push({
   }
 });
 projection.supplies = [{
-  provider: "school_supplies",
+  id: "school_supplies:0",
   title: "Algebra I Supply List",
-  sourceUrl: "https://phs.comalisd.org/apps/pages/index.jsp?pREC_ID=2692760&type=u&uREC_ID=2803759",
   sourceTitle: "Algebra I Supply List",
+  outbound: { available: true, policy: "guardian_approval" },
+  source: { provider: "school_supplies", recordType: "supply_list", externalId: "school_supplies:0", sourceUpdatedAt: null },
   items: [
     { id: "supply_notebook", text: "1 composition notebook", quantity: null, sourceOrdinal: 1, kind: "item" },
     { id: "supply_pencils", text: "Pencils", quantity: null, sourceOrdinal: 2, kind: "item" }
@@ -92,23 +91,16 @@ projection.supplies = [{
 }];
 
 test("Emily can use the complete calm student journey", async ({ page }) => {
-  await page.route("**/api/sessions", async (route) => {
-    await route.fulfill({
-      status: 201,
-      contentType: "application/json",
-      body: JSON.stringify({
-        sessionId: "session_student_e2e",
-        csrfToken: "csrf-student-e2e",
-        profile: { name: "Emily", grade: 9 }
-      })
-    });
-  });
-  await page.route("**/api/student/projection", async (route) => {
-    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-student-e2e");
+  await page.route("**/api/student/bootstrap", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(projection)
+      body: JSON.stringify({
+        csrfToken: "csrf-student-e2e",
+        profile: { name: "Emily", grade: 9 },
+        session: { reused: false, expiresAt: "2026-08-17T16:00:00.000Z" },
+        projection
+      })
     });
   });
   await page.route("**/api/focus-blocks", async (route) => {
@@ -127,12 +119,9 @@ test("Emily can use the complete calm student journey", async ({ page }) => {
   });
   await page.goto("/student");
 
-  await expect(page.getByRole("heading", { name: "Hi Emily." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Grade 9 summer readiness is ready." })).toBeVisible();
-  await expect(page.getByText("Real class names appear only after a school source sync", { exact: false })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Today" })).toHaveAttribute("aria-selected", "true");
-
-  await page.getByRole("button", { name: "Show me my first step" }).click();
+  await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening), Emily\./ })).toBeVisible();
+  await expect(page.getByText("No guessed deadlines or events")).toBeVisible();
   await expect(page.getByRole("heading", { name: /One thing at a time|You’re caught up/ })).toBeVisible();
   await expect(page.getByText("You do not need to hold the whole day in your head.")).toBeVisible();
 

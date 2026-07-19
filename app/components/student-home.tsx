@@ -1,23 +1,42 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 
 import type { CourseId } from "../../lib/domain/learning-tracks";
+import type { StudentCheckInAction } from "../../lib/domain/student-daily-check-in";
 import { buildStudentLearningOptions } from "../../lib/domain/student-learning-options";
 import type {
   ProjectedPriority,
   StudentSourceProjection
 } from "../../lib/domain/student-source-projection";
-import { LearningWorkspace } from "./learning-workspace";
-import { StudentAIPlanner } from "./student-ai-planner";
-import { StudentCalendar } from "./student-calendar";
-import { StudentClasses } from "./student-classes";
+import { StudentDailyCheckIn } from "./student-daily-check-in";
 import { StudentFamilyAssist } from "./student-family-assist";
 import { StudentPlanningBoardView } from "./student-planning-board";
 import { StudentTaskRoom, type StudentTaskRoomResult } from "./student-task-room";
-import { StudentSupplies } from "./student-supplies";
 import styles from "./student-home.module.css";
+
+const LearningWorkspace = dynamic(
+  () => import("./learning-workspace").then((module) => module.LearningWorkspace),
+  { ssr: false, loading: () => <section className={styles.loading}>Opening the learning room…</section> }
+);
+const StudentAIPlanner = dynamic(
+  () => import("./student-ai-planner").then((module) => module.StudentAIPlanner),
+  { ssr: false, loading: () => <section className={styles.loading}>Opening the planner…</section> }
+);
+const StudentCalendar = dynamic(
+  () => import("./student-calendar").then((module) => module.StudentCalendar),
+  { ssr: false, loading: () => <section className={styles.loading}>Opening Calendar…</section> }
+);
+const StudentClasses = dynamic(
+  () => import("./student-classes").then((module) => module.StudentClasses),
+  { ssr: false, loading: () => <section className={styles.loading}>Opening Classes…</section> }
+);
+const StudentSupplies = dynamic(
+  () => import("./student-supplies").then((module) => module.StudentSupplies),
+  { ssr: false, loading: () => <section className={styles.loading}>Opening Supplies…</section> }
+);
 
 type StudentView = "today" | "calendar" | "classes" | "supplies" | "learn";
 
@@ -42,9 +61,13 @@ function errorMessage(value: unknown): string {
 }
 
 export function StudentHome({ student }: { student: Student }) {
-  const hydrated = useSyncExternalStore(() => () => undefined, () => true, () => false);
   const [view, setView] = useState<StudentView>("today");
-  const [status, setStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
+  const [status, setStatus] = useState<"starting" | "active" | "error">("starting");
+  const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
+  const bootstrapRequest = useRef<Promise<{
+    csrfToken: string;
+    projection: StudentSourceProjection;
+  }> | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [projection, setProjection] = useState<StudentSourceProjection | null>(null);
   const [projectionError, setProjectionError] = useState("");
@@ -62,29 +85,46 @@ export function StudentHome({ student }: { student: Student }) {
   );
 
   useEffect(() => {
-    if (status !== "active" || !csrfToken) return;
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const response = await fetch("/api/student/projection", {
+    let cancelled = false;
+    if (!bootstrapRequest.current) {
+      bootstrapRequest.current = (async () => {
+        const response = await fetch("/api/student/bootstrap", {
           method: "POST",
-          headers: { "content-type": "application/json", "x-homeroom-csrf": csrfToken },
-          body: "{}",
-          signal: controller.signal
+          headers: { "content-type": "application/json" },
+          body: "{}"
         });
-        const data = await response.json() as StudentSourceProjection | { error?: { message?: string } };
-        if (!response.ok || !("today" in data)) {
-          throw new Error("error" in data ? data.error?.message : "Unable to organize your school sources.");
+        const data = await response.json() as {
+          csrfToken?: unknown;
+          projection?: unknown;
+          error?: { message?: string };
+        };
+        if (
+          !response.ok ||
+          typeof data.csrfToken !== "string" ||
+          !data.projection ||
+          typeof data.projection !== "object" ||
+          !("today" in data.projection)
+        ) {
+          throw new Error(errorMessage(data));
         }
-        setProjection(data);
-      } catch (caught) {
-        if (!controller.signal.aborted) {
-          setProjectionError(caught instanceof Error ? caught.message : "Unable to organize your school sources.");
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, [csrfToken, status]);
+        return {
+          csrfToken: data.csrfToken,
+          projection: data.projection as StudentSourceProjection
+        };
+      })();
+    }
+    void bootstrapRequest.current.then((result) => {
+      if (cancelled) return;
+      setCsrfToken(result.csrfToken);
+      setProjection(result.projection);
+      setStatus("active");
+    }).catch((caught) => {
+      if (cancelled) return;
+      setStatus("error");
+      setError(caught instanceof Error ? caught.message : "Your Today page could not be opened yet.");
+    });
+    return () => { cancelled = true; };
+  }, [bootstrapAttempt]);
 
   useEffect(() => {
     if (status !== "active" || !csrfToken) return;
@@ -110,34 +150,17 @@ export function StudentHome({ student }: { student: Student }) {
     return () => { document.body.style.overflow = previousOverflow; };
   }, [plannerOpen]);
 
-  async function startStudentSession(targetView: StudentView = "today") {
-    setView(targetView);
-    if (status === "active") return;
-    if (status === "starting") return;
+  function retryBootstrap() {
+    bootstrapRequest.current = null;
     setStatus("starting");
     setError("");
     setProjectionError("");
-    try {
-      const response = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ fixtureKey: "emily_band_camp_v1", role: "student" })
-      });
-      const data = await response.json() as { csrfToken?: unknown } | { error?: { message?: string } };
-      if (!response.ok || !("csrfToken" in data) || typeof data.csrfToken !== "string") {
-        throw new Error(errorMessage(data));
-      }
-      setCsrfToken(data.csrfToken);
-      setStatus("active");
-    } catch (caught) {
-      setStatus("error");
-      setError(caught instanceof Error ? caught.message : "Homeroom could not start yet.");
-    }
+    setProjection(null);
+    setBootstrapAttempt((current) => current + 1);
   }
 
   function openView(nextView: StudentView) {
     if (status === "active") setView(nextView);
-    else void startStudentSession(nextView);
   }
 
   function openLearningRoom(courseId: CourseId) {
@@ -146,6 +169,27 @@ export function StudentHome({ student }: { student: Student }) {
     setLearningCourseId(courseId);
     setLearningRequestKey((current) => current + 1);
     setView("learn");
+  }
+
+  function handleCheckInAction(action: StudentCheckInAction) {
+    if (action.kind === "task") {
+      const priority = projection?.priorities.find((candidate) => candidate.id === action.priorityId);
+      if (priority) setSelectedPriority(priority);
+      return;
+    }
+    if (action.kind === "calendar") {
+      setView("calendar");
+      return;
+    }
+    if (action.kind === "classes") {
+      setView("classes");
+      return;
+    }
+    if (action.kind === "learning") {
+      openLearningRoom(action.courseId);
+      return;
+    }
+    if (action.kind === "planner") setPlannerOpen(true);
   }
 
   async function finishTask(result: StudentTaskRoomResult) {
@@ -186,7 +230,7 @@ export function StudentHome({ student }: { student: Student }) {
               aria-selected={view === tab.id}
               aria-controls={`student-panel-${tab.id}`}
               className={view === tab.id ? styles.activeTab : ""}
-              disabled={!hydrated || status === "starting"}
+              disabled={status !== "active"}
               onClick={() => openView(tab.id)}
             ><span aria-hidden="true">{tab.icon}</span>{tab.label}</button>
           ))}
@@ -194,33 +238,26 @@ export function StudentHome({ student }: { student: Student }) {
         <Link className={styles.identity} href="/" aria-label="Switch Homeroom profile"><span>E</span><div><strong>{student.name}</strong><small>Grade {student.grade} · switch</small></div></Link>
       </header>
 
-      {status !== "active" ? (
-        <section className={styles.welcome} aria-labelledby="student-welcome-title">
-          <div className={styles.welcomeArt} aria-hidden="true">
-            <span className={styles.sun} />
-            <div className={styles.path}><i>1</i><span /><i>2</i><span /><i>3</i></div>
-          </div>
-          <p className={styles.eyebrow}>YOUR HOMEROOM</p>
-          <h1 id="student-welcome-title">Hi {student.name}.</h1>
-          <h2>Let’s make today feel smaller.</h2>
-          <p>We’ll pick one thing, show the first step, and keep the rest out of the way.</p>
-          <button type="button" onClick={() => startStudentSession("today")} disabled={!hydrated || status === "starting"}>
-            {!hydrated ? "Loading Homeroom…" : status === "starting" ? "Connecting your school day…" : "Show me my first step"}<span aria-hidden="true">→</span>
-          </button>
-          <div className={styles.promise} aria-label="Three-step focus flow">
-            <span><i>1</i><strong>Pick one</strong></span>
-            <span><i>2</i><strong>Focus</strong></span>
-            <span><i>3</i><strong>Feel done</strong></span>
-          </div>
-          <section className={styles.classPreview} aria-labelledby="class-preview-title">
-            <div><p>STARTING GRADE {student.grade}</p><h3 id="class-preview-title">Grade {student.grade} summer readiness is ready.</h3></div>
-            <p>Real class names appear only after a school source sync. Until then, Homeroom offers clearly labeled grade-based practice.</p>
-            <button type="button" onClick={() => startStudentSession("learn")} disabled={!hydrated || status === "starting"}>Explore readiness <span aria-hidden="true">→</span></button>
-          </section>
-          {error && <p className={styles.error} role="alert">{error}</p>}
-        </section>
-      ) : (
-        <section className={styles.workspace}>
+      <section className={styles.workspace}>
+          {status === "starting" && (
+            <section className={styles.todayLifecycle} aria-live="polite" aria-labelledby="student-today-loading-title">
+              <span className={styles.lifecyclePulse} aria-hidden="true">✦</span>
+              <p>VERIFIED STUDENT SPACE</p>
+              <h1 id="student-today-loading-title">Opening {student.name}’s Today page</h1>
+              <span>Connecting verified school sources and finding one useful next step…</span>
+            </section>
+          )}
+          {status === "error" && (
+            <section className={styles.todayLifecycle} role="alert" aria-labelledby="student-today-error-title">
+              <span className={styles.lifecyclePulse} aria-hidden="true">↻</span>
+              <p>TODAY NEEDS ANOTHER TRY</p>
+              <h1 id="student-today-error-title">Your school day did not load yet.</h1>
+              <span>{error}</span>
+              <div><button type="button" onClick={retryBootstrap}>Try Today again</button><Link href="/">Return to sign in</Link></div>
+            </section>
+          )}
+          {status === "active" && (
+            <>
           {projectionError && <p className={styles.error} role="alert">{projectionError}</p>}
           {!projection && !projectionError && <section className={styles.loading} aria-live="polite">Connecting Classroom and calendar…</section>}
 
@@ -228,6 +265,12 @@ export function StudentHome({ student }: { student: Student }) {
             <div id="student-panel-today" role="tabpanel" aria-labelledby="student-tab-today">
               {reentry?.active && <p className={styles.completionNotice}><strong>{reentry.title}</strong> {reentry.message}</p>}
               {completedPriorityIds.length > 0 && <p className={styles.completionNotice}>✓ Focus block saved in Homeroom. Your school source remains unchanged until you submit there.</p>}
+              <StudentDailyCheckIn
+                studentName={student.name}
+                projection={projection}
+                csrfToken={csrfToken}
+                onAction={handleCheckInAction}
+              />
               <StudentPlanningBoardView
                 projection={projection}
                 view="today"
@@ -258,8 +301,9 @@ export function StudentHome({ student }: { student: Student }) {
               <LearningWorkspace key={learningRequestKey} courses={displayedCourses} csrfToken={csrfToken} initialCourseId={learningCourseId} grade={student.grade} />
             </div>
           )}
-        </section>
-      )}
+            </>
+          )}
+      </section>
 
       {selectedPriority && (
         <StudentTaskRoom

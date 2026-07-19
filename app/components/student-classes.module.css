@@ -13,7 +13,7 @@
 .classCard { background: #fff; border: 1px solid #dce7e2; border-radius: 1.15rem; box-shadow: 0 10px 30px rgba(31, 66, 55, .055); overflow: hidden; }
 .classCard.expanded { border-color: #8fb5a6; box-shadow: 0 15px 36px rgba(31, 66, 55, .09); }
 .classSummary { align-items: center; background: #fff; border: 0; color: inherit; cursor: pointer; display: grid; gap: 1rem; grid-template-columns: 2.6rem minmax(0, 1fr) auto 1.5rem; padding: 1rem 1.15rem; text-align: left; width: 100%; }
-.classSummary:focus-visible, .panelHeading button:focus-visible, .panelFooter a:focus-visible { outline: 3px solid #f1a187; outline-offset: -3px; }
+.classSummary:focus-visible, .panelHeading button:focus-visible { outline: 3px solid #f1a187; outline-offset: -3px; }
 .period { align-items: center; background: #e7f2ec; border-radius: .8rem; color: #2d6b55; display: flex; font-family: Georgia, serif; font-size: 1.05rem; font-weight: 800; height: 2.6rem; justify-content: center; }
 .classIdentity { display: flex; flex-direction: column; min-width: 0; }
 .classIdentity strong { font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -53,7 +53,6 @@
 .panelFooter { align-items: center; border-top: 1px solid #e1ebe6; display: flex; font-size: .7rem; justify-content: space-between; margin-top: 1rem; padding-top: .8rem; }
 .panelFooter span { align-items: center; display: flex; gap: .4rem; }
 .panelFooter i { border-radius: .3rem; height: 1.25rem; width: 1.25rem; }
-.panelFooter a { color: #245f4b; font-weight: 750; text-decoration: none; }
 .organizationCue { align-items: center; color: #63766f; display: flex; font-size: .76rem; gap: .4rem; justify-content: center; margin: 1.2rem 0 0; }
 .organizationCue > span { align-items: center; background: #e7f2ec; border-radius: 50%; color: #2d6b55; display: flex; height: 1.7rem; justify-content: center; width: 1.7rem; }
 

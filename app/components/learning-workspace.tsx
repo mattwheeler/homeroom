@@ -406,6 +406,12 @@ export function LearningWorkspace({
         <span className="learning-trust">Private by default · no grades</span>
       </header>
 
+      <div className="learning-taxonomy" aria-label="How Learning rooms are created">
+        <span><i aria-hidden="true">G</i><strong>From school</strong><small>Shown only when class names or due-work signals come from a connected source.</small></span>
+        <span><i aria-hidden="true">◇</i><strong>Readiness practice</strong><small>Homeroom-created coaching—not a teacher assignment or grade.</small></span>
+        <span><i aria-hidden="true">◷</i><strong>Life skills</strong><small>Time management, organization, and prioritization are built in.</small></span>
+      </div>
+
       <div className="learning-track-grid">
         {visibleCourses.map((course) => {
           const track = getLearningTrack(course.id);
@@ -419,9 +425,13 @@ export function LearningWorkspace({
               onClick={() => selectTrack(course.id)}
             >
               <span>{course.name}</span>
+              <div className="learning-origin-row">
+                {course.mode === "connected_class" && <span>From school</span>}
+                <span>Readiness practice</span>
+              </div>
               <strong>{track.mission.title}</strong>
-              <em>{recommendationReason(course)}</em>
-              <small>{track.mission.suggestedMinutes} min readiness</small>
+              <em><b>Why this is here:</b> {recommendationReason(course)}</em>
+              <small>{track.mission.suggestedMinutes} min · Life skills built in</small>
             </button>
           );
         })}
@@ -458,7 +468,7 @@ export function LearningWorkspace({
             <section className="learning-stage" aria-live="polite">
               <header className="learning-stage-heading">
                 <div>
-                  <span className="source-chip">{selectedTrack.mission.source.label}</span>
+                  <span className="source-chip">Readiness practice · {selectedTrack.mission.source.label}</span>
                   <h3>{selectedTrack.trackTitle}</h3>
                   <p>A guided workspace for planning, seeing, practicing, and explaining—not a one-question quiz.</p>
                 </div>

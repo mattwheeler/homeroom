@@ -17,7 +17,8 @@ const packingPriority: Priority = {
   priorityBand: "do_first",
   title: "Band Camp Packing Checklist",
   directions: "Use the director’s list to pack your instrument, water jug, drill book, sunscreen, and athletic shoes.",
-  sourceLink: "https://classroom.google.com/c/concert_band/a/packing",
+  sourceLink: null,
+  outbound: { available: true, policy: "guardian_approval" },
   course: {
     externalId: "concert_band",
     name: "Concert Band - Period 6",
@@ -90,7 +91,8 @@ describe("StudentTaskRoom", () => {
     expect(html).toContain("Google Classroom");
     expect(html).toContain("Directions");
     expect(html).toContain("Use the director’s list to pack your instrument");
-    expect(html).toContain("Open the original assignment");
+    expect(html).toContain("Ask your guardian to open");
+    expect(html).not.toContain("href=");
     expect(html).toContain("Gather");
     expect(html).toContain("Compare each item with the director&#x27;s checklist.");
     expect(html).toContain("Place by the door");

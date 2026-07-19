@@ -174,17 +174,17 @@ export function buildGuardianWorkspace(
       ),
       sourceSummary(
         "band_ical",
-        "Band calendar feed",
+        "Private calendar feed",
         statuses.find((source) => source.provider === "band_ical")
       ),
       sourceSummary(
         "school_calendar",
-        "Pieper + Comal ISD calendar",
+        "Official school or district calendar",
         statuses.find((source) => source.provider === "school_calendar")
       ),
       sourceSummary(
         "school_supplies",
-        "Official school supply lists",
+        "Official school or course supply list",
         statuses.find((source) => source.provider === "school_supplies")
       )
     ]

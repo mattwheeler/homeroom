@@ -20,7 +20,8 @@ const classes: ProjectedSourceClass[] = classNames.map(([externalId, name, secti
   section,
   subject,
   trackCourseId,
-  alternateLink: `https://classroom.google.com/c/${externalId}`,
+  alternateLink: null,
+  outbound: { available: true, policy: "guardian_approval" },
   source: { provider: "google_classroom", recordType: "course", externalId, sourceUpdatedAt: null }
 }));
 
@@ -39,6 +40,8 @@ function priority(input: {
     rank: input.rank,
     priorityBand: input.rank === 1 ? "do_first" : "plan_next",
     title: input.title,
+    sourceLink: null,
+    outbound: { available: true, policy: "guardian_approval" },
     course: {
       externalId: input.courseExternalId,
       name: input.courseName,
@@ -128,6 +131,7 @@ export const navigationProjection: StudentSourceProjection = {
       { provider: "band_ical", status: "active", displayName: "BAND calendar", lastSyncAt: "2026-08-17T13:40:00.000Z", lastErrorCode: null }
     ]
   },
+  outboundNavigation: { externalLinks: "guardian_approval" },
   skillScaffolds: [],
   today: { date: "2026-08-17", timeline: [] },
   week: {
@@ -142,7 +146,7 @@ export const navigationProjection: StudentSourceProjection = {
     taskId: "google_classroom:coursework:physical_form",
     title: "Band physical form",
     courseName: "Concert Band - Period 6",
-    due: { date: "2026-07-24", time: "17:00:00" },
+    due: { date: "2026-08-17", time: "17:00:00" },
     reason: "The connected school source indicates that a parent or guardian may need to handle this item.",
     source: { provider: "google_classroom", recordType: "coursework", externalId: "physical_form", sourceUpdatedAt: null }
   }],

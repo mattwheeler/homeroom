@@ -7,7 +7,8 @@ describe("student source-backed supplies experience", () => {
     expect(source).toContain("From your school’s official list");
     expect(source).toContain("Homeroom did not add or guess any item");
     expect(source).toContain("item.quantity === null");
-    expect(source).toContain("list.sourceUrl");
+    expect(source).not.toContain("list.sourceUrl");
+    expect(source).toContain("StudentOutboundGuard");
     expect(source).toContain('item.kind === "group_label"');
     expect(source).toContain('item.kind === "separator"');
     expect(source).toContain('filter((item) => item.kind === "item")');

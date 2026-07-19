@@ -125,6 +125,14 @@ export function StudentCalendar({
   }, [calendarItems]);
   const days = useMemo(() => buildCalendarMonth(visibleMonth), [visibleMonth]);
   const selectedItems = itemMap.get(selectedDate) ?? [];
+  const guardianAssist = projection.guardianAssistCandidates?.find((candidate) =>
+    candidate.due?.date === selectedDate
+  ) ?? projection.guardianAssistCandidates?.find((candidate) =>
+    candidate.due?.date.startsWith(visibleMonth)
+  );
+  const guardianAssistPriority = guardianAssist
+    ? projection.priorities.find((priority) => priority.id === guardianAssist.taskId)
+    : undefined;
 
   function moveMonth(change: number) {
     const nextMonth = shiftMonthKey(visibleMonth, change);
@@ -142,6 +150,20 @@ export function StudentCalendar({
         </div>
         <span className={styles.visualKey}><i /> Schoolwork <i /> Band <i /> School</span>
       </header>
+
+      {guardianAssist && (
+        <aside className={styles.assistNudge} aria-label="Guardian assist candidate">
+          <span aria-hidden="true">◇</span>
+          <div>
+            <small>Guardian assist · source-backed</small>
+            <strong>{guardianAssist.title}</strong>
+            <p>{guardianAssist.reason}</p>
+          </div>
+          {guardianAssistPriority && onOpenTask && (
+            <button type="button" onClick={() => onOpenTask(guardianAssistPriority)}>Review task</button>
+          )}
+        </aside>
+      )}
 
       <div className={styles.layout}>
         <section className={styles.monthCard} aria-label={`${monthLabel(visibleMonth)} calendar`}>

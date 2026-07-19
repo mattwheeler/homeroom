@@ -141,6 +141,7 @@ describe("live student source projection", () => {
     const result = projectStudentSources({
       snapshot: snapshot(),
       profile,
+      externalLinkPolicy: "guardian_approval",
       now: new Date("2026-08-17T14:00:00.000Z")
     });
 
@@ -186,7 +187,8 @@ describe("live student source projection", () => {
     ]);
     expect(result.priorities[0]).toMatchObject({
       directions: "Complete problems 1-5 and explain why both sides stay balanced.",
-      sourceLink: "https://classroom.google.com/c/google_algebra/a/work_algebra_today",
+      sourceLink: null,
+      outbound: { available: true, policy: "guardian_approval" },
       course: { externalId: "google_algebra", trackCourseId: "course_algebra_1" },
       urgency: { level: "today", label: "Due today", visualToken: "coral" },
       effort: { level: "medium", estimatedMinutes: 20 },
@@ -230,6 +232,63 @@ describe("live student source projection", () => {
       expect.objectContaining({ source: expect.objectContaining({ externalId: "work_english_tomorrow" }) })
     ]);
     expect(JSON.stringify(result)).not.toContain("work_biology_complete");
+    expect(JSON.stringify(result)).not.toContain("https://classroom.google.com");
+  });
+
+  it.each(["blocked", "guardian_approval"] as const)(
+    "never delivers source URLs to the student projection when external links are %s",
+    (externalLinkPolicy) => {
+      const schoolSnapshot = {
+        connections: [{
+          id: "school-source-1",
+          provider: "school_supplies" as const,
+          status: "active" as const,
+          displayName: "Official supply list",
+          sourceUrl: "https://schools.example.edu/supplies/grade-9",
+          lastSyncAt: "2026-08-17T13:00:00.000Z",
+          lastErrorCode: null
+        }],
+        events: [],
+        supplyLists: [{
+          provider: "school_supplies" as const,
+          title: "Grade 9 supply list",
+          sourceUrl: "https://schools.example.edu/supplies/grade-9",
+          sourceTitle: "Official supply list",
+          items: [{ id: "pencils", text: "Pencils", quantity: 2, sourceOrdinal: 1, kind: "item" as const }]
+        }]
+      };
+      const result = projectStudentSources({
+        snapshot: snapshot(),
+        schoolSnapshot,
+        profile,
+        externalLinkPolicy,
+        now: new Date("2026-08-17T14:00:00.000Z")
+      });
+      const serialized = JSON.stringify(result);
+
+      expect(serialized).not.toContain("https://classroom.google.com");
+      expect(serialized).not.toContain("https://schools.example.edu");
+      expect(result.outboundNavigation).toEqual({ externalLinks: externalLinkPolicy });
+      expect(result.classes?.find((course) => course.externalId === "google_algebra")).toMatchObject({
+        alternateLink: null,
+        outbound: { available: true, policy: externalLinkPolicy }
+      });
+      expect(result.supplies?.[0]).toMatchObject({
+        id: "school_supplies:0",
+        outbound: { available: true, policy: externalLinkPolicy }
+      });
+      expect(result.supplies?.[0]).not.toHaveProperty("sourceUrl");
+      expect(result.sourceSummary.schoolConnections?.[0]).not.toHaveProperty("sourceUrl");
+    }
+  );
+
+  it("fails closed for an invalid external-link policy", () => {
+    expect(() => projectStudentSources({
+      snapshot: snapshot(),
+      profile,
+      externalLinkPolicy: "allow" as "blocked",
+      now: new Date("2026-08-17T14:00:00.000Z")
+    })).toThrow("external-link policy");
   });
 
   it("recommends a timeboxed Learning track grounded in the highest live priority", () => {

@@ -19,6 +19,10 @@ describe("attention-aware Learning chooser", () => {
     expect(html).toContain("Concert and Marching Band");
     expect(html).toContain("Band camp is coming up");
     expect(html).toContain("Practice for upcoming Algebra work");
+    expect(html).toContain("From school");
+    expect(html).toContain("Readiness practice");
+    expect(html).toContain("Life skills");
+    expect(html).toContain("Why this is here");
   });
 
   it("labels grade readiness honestly when no school classes are connected", () => {
@@ -32,6 +36,7 @@ describe("attention-aware Learning chooser", () => {
     expect(html).toContain("Your school classes aren’t synced yet");
     expect(html).toContain("Math foundations");
     expect(html).toContain("Homeroom-created for Grade 9");
+    expect(html).toContain("Readiness practice");
     expect(html).not.toContain("Band camp is coming up");
   });
 });

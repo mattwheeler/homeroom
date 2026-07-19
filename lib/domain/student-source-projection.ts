@@ -10,6 +10,13 @@ import type { ClassroomCourse, ClassroomCoursework } from "../source/google-clas
 import type { SourceProvider, SourceSnapshot } from "../storage/source-connection-store";
 import type { OfficialSchoolCalendarEvent } from "../source/official-school-calendar";
 import type { SchoolSourceProvider, SchoolSourceSnapshot } from "../storage/school-source-store";
+import {
+  studentExternalLinkPolicySchema,
+  studentOutboundResource,
+  type StudentExternalLinkPolicy,
+  type StudentOutboundResource
+} from "./student-external-links";
+import type { OfficialSupplyItem } from "../source/official-school-supplies";
 
 export type StudentProjectionProfile = StudentSupportProfile & {
   timeZone: string;
@@ -33,6 +40,7 @@ export interface ProjectedPriority {
   title: string;
   directions?: string | null;
   sourceLink?: string | null;
+  outbound?: StudentOutboundResource;
   course: {
     externalId: string;
     name: string;
@@ -74,6 +82,16 @@ export interface ProjectedSourceClass {
   subject: string | null;
   trackCourseId: CourseId | null;
   alternateLink: string | null;
+  outbound?: StudentOutboundResource;
+  source: ProjectionEvidence;
+}
+
+export interface ProjectedSupplyList {
+  id: string;
+  title: string;
+  sourceTitle: string;
+  items: OfficialSupplyItem[];
+  outbound: StudentOutboundResource;
   source: ProjectionEvidence;
 }
 
@@ -119,8 +137,9 @@ export interface StudentSourceProjection {
     completedCourseworkCount: number;
     eventCount: number;
     connections: SourceSnapshot["connections"];
-    schoolConnections?: SchoolSourceSnapshot["connections"];
+    schoolConnections?: Array<Omit<SchoolSourceSnapshot["connections"][number], "sourceUrl">>;
   };
+  outboundNavigation?: { externalLinks: StudentExternalLinkPolicy };
   skillScaffolds: Array<{
     skill: ExecutiveSkill;
     label: string;
@@ -143,7 +162,7 @@ export interface StudentSourceProjection {
   guardianAssistCandidates?: ProjectedGuardianAssist[];
   classes?: ProjectedSourceClass[];
   calendar?: { items: ProjectedCalendarItem[] };
-  supplies?: SchoolSourceSnapshot["supplyLists"];
+  supplies?: ProjectedSupplyList[];
 }
 
 interface TimelineBlock {
@@ -427,6 +446,7 @@ function projectedPriority(input: {
   currentDate: string;
   maxDirectionsAtOnce: 2 | 3;
   recommendedTimeboxLimit: number;
+  externalLinkPolicy: StudentExternalLinkPolicy;
 }): ProjectedPriority {
   const days = daysBetween(input.currentDate, input.work.dueDate);
   const urgencyValue = urgency(days, input.work.late);
@@ -439,7 +459,8 @@ function projectedPriority(input: {
     priorityBand: priorityBand(urgencyValue.level),
     title: input.work.title,
     directions: input.work.description?.trim() || null,
-    sourceLink: input.work.alternateLink,
+    sourceLink: null,
+    outbound: studentOutboundResource(Boolean(input.work.alternateLink), input.externalLinkPolicy),
     course: {
       externalId: input.course.externalId,
       name: input.course.name,
@@ -539,6 +560,7 @@ export function projectStudentSources(input: {
   snapshot: SourceSnapshot;
   schoolSnapshot?: SchoolSourceSnapshot;
   profile: StudentProjectionProfile;
+  externalLinkPolicy?: StudentExternalLinkPolicy;
   now?: Date;
 }): StudentSourceProjection {
   const supportProfile: StudentSupportProfile = {
@@ -555,6 +577,12 @@ export function projectStudentSources(input: {
   }
   if (!["example_first", "questions_first", "mix_it_up"].includes(input.profile.supportPreference)) {
     throw new StudentSourceProjectionError("The student support preference is invalid.");
+  }
+  const externalLinkPolicy = studentExternalLinkPolicySchema.safeParse(
+    input.externalLinkPolicy ?? "blocked"
+  );
+  if (!externalLinkPolicy.success) {
+    throw new StudentSourceProjectionError("The external-link policy is invalid.");
   }
   const now = input.now ?? new Date();
   if (Number.isNaN(now.getTime())) throw new StudentSourceProjectionError("The projection time is invalid.");
@@ -584,7 +612,8 @@ export function projectStudentSources(input: {
       course,
       currentDate,
       maxDirectionsAtOnce: policy.maxDirectionsAtOnce,
-      recommendedTimeboxLimit
+      recommendedTimeboxLimit,
+      externalLinkPolicy: externalLinkPolicy.data
     })] : [];
   }).sort(prioritySort).map((priority, index) => ({ ...priority, rank: index + 1 }));
   const schoolEvents = relevantSchoolEvents(input.schoolSnapshot, parsedProfile.data.grade);
@@ -739,7 +768,8 @@ export function projectStudentSources(input: {
     section: course.section,
     subject: course.subject,
     trackCourseId: course.trackCourseId,
-    alternateLink: course.alternateLink,
+    alternateLink: null,
+    outbound: studentOutboundResource(Boolean(course.alternateLink), externalLinkPolicy.data),
     source: sourceForCourse(course)
   }));
   const calendarItems: ProjectedCalendarItem[] = priorities.flatMap((priority) => priority.due ? [{
@@ -815,8 +845,16 @@ export function projectStudentSources(input: {
       completedCourseworkCount: completedCount,
       eventCount: input.snapshot.events.length + schoolEvents.length,
       connections: input.snapshot.connections,
-      schoolConnections: input.schoolSnapshot?.connections ?? []
+      schoolConnections: (input.schoolSnapshot?.connections ?? []).map((connection) => ({
+        id: connection.id,
+        provider: connection.provider,
+        status: connection.status,
+        displayName: connection.displayName,
+        lastSyncAt: connection.lastSyncAt,
+        lastErrorCode: connection.lastErrorCode
+      }))
     },
+    outboundNavigation: { externalLinks: externalLinkPolicy.data },
     skillScaffolds: policy.requiredExecutiveRoutines.map((routine) => ({
       ...routine,
       visualPattern: visualPattern[routine.skill],
@@ -836,6 +874,18 @@ export function projectStudentSources(input: {
     }),
     classes: projectedClasses,
     calendar: { items: calendarItems },
-    supplies: input.schoolSnapshot?.supplyLists ?? []
+    supplies: (input.schoolSnapshot?.supplyLists ?? []).map((list, index) => ({
+      id: `school_supplies:${index}`,
+      title: list.title,
+      sourceTitle: list.sourceTitle,
+      items: list.items,
+      outbound: studentOutboundResource(Boolean(list.sourceUrl), externalLinkPolicy.data),
+      source: {
+        provider: "school_supplies",
+        recordType: "supply_list",
+        externalId: `school_supplies:${index}`,
+        sourceUpdatedAt: null
+      }
+    }))
   };
 }

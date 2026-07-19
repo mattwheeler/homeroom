@@ -9,6 +9,7 @@ import type {
   StudentSourceProjection
 } from "../../lib/domain/student-source-projection";
 import styles from "./student-classes.module.css";
+import { StudentOutboundGuard } from "./student-outbound-guard";
 
 export interface StudentClassGroup {
   course: ProjectedSourceClass;
@@ -33,6 +34,7 @@ function fallbackClasses(projection: StudentSourceProjection): ProjectedSourceCl
       subject: null,
       trackCourseId: priority.course.trackCourseId,
       alternateLink: null,
+      outbound: { available: false, policy: projection.outboundNavigation?.externalLinks ?? "blocked" },
       source: {
         provider: "google_classroom",
         recordType: "course",
@@ -42,6 +44,16 @@ function fallbackClasses(projection: StudentSourceProjection): ProjectedSourceCl
     });
   }
   return [...courses.values()];
+}
+
+export function connectedClassContext(projection: StudentSourceProjection): string {
+  const nextDistrictDate = projection.calendar?.items.find((item) =>
+    item.source.provider === "school_calendar" && item.date >= projection.context.localDate
+  );
+  if (nextDistrictDate) {
+    return `Official district calendar: ${nextDistrictDate.title} · ${nextDistrictDate.date}.`;
+  }
+  return "Connected from Google Classroom · sorted by next due date when you choose that view.";
 }
 
 export function groupAssignmentsByClass(
@@ -107,7 +119,7 @@ export function StudentClasses({
         <div>
           <p>CLASSES · ORGANIZED FOR YOU</p>
           <h2 id="student-classes-title">All {groups.length} connected classes.</h2>
-          <span>Open one class at a time. Homeroom keeps its assignments and Learning room together.</span>
+          <span>{connectedClassContext(projection)}</span>
         </div>
         <div className={styles.introTools}>
           <div className={styles.sortControl} aria-label="Organize classes">
@@ -185,7 +197,9 @@ export function StudentClasses({
 
                   <footer className={styles.panelFooter}>
                     <span><i aria-hidden="true">G</i> Google Classroom</span>
-                    {course.alternateLink && <a href={course.alternateLink} target="_blank" rel="noreferrer">Open source class <span aria-hidden="true">↗</span></a>}
+                    {course.outbound?.available && (
+                      <StudentOutboundGuard policy={course.outbound.policy} resourceLabel="source class" />
+                    )}
                   </footer>
                 </div>
               )}

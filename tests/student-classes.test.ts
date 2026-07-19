@@ -44,6 +44,9 @@ describe("student connected-class directory", () => {
     expect(html).toContain("Due today");
     expect(html).toContain("Google Classroom");
     expect(html).toContain("Open Algebra I - Period 2 Learning room");
+    expect(html).toContain("Ask your guardian to open");
+    expect(html).not.toContain("href=");
+    expect(html).toContain("sorted by next due date");
     expect(html).not.toContain("Summer Reading Reflection");
     expect((html.match(/aria-expanded="true"/g) ?? [])).toHaveLength(1);
   });
@@ -70,5 +73,31 @@ describe("student connected-class directory", () => {
     expect(html).not.toContain("Balancing Equations Readiness Check");
     expect(html).toContain("Period order");
     expect(html).toContain("Next due");
+  });
+
+  it("names an official date only when it comes from the trusted district calendar", () => {
+    const trusted = structuredClone(navigationProjection);
+    trusted.calendar?.items.push({
+      id: "school_calendar:first_day",
+      kind: "event",
+      title: "First day of school",
+      date: "2026-08-24",
+      timeLabel: "All day",
+      startsAt: null,
+      endsAt: null,
+      courseExternalId: null,
+      courseName: null,
+      statusLabel: "School event",
+      visualToken: "blue",
+      category: "school",
+      source: { provider: "school_calendar", recordType: "calendar_event", externalId: "first_day", sourceUpdatedAt: "2026-03-02T00:00:00.000Z" }
+    });
+    const html = renderToStaticMarkup(createElement(StudentClasses, {
+      projection: trusted,
+      onOpenLearning: vi.fn()
+    }));
+
+    expect(html).toContain("Official district calendar: First day of school · 2026-08-24");
+    expect(html).not.toContain("Fall term");
   });
 });

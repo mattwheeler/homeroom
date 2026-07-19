@@ -36,7 +36,12 @@ export async function POST(request: Request) {
     }
     const body = requestSchema.parse(await request.json());
     const store = new D1GuardianInboxStore(env.HOMEROOM_DB);
-    if (body.action === "list") return Response.json(await listGuardianInbox({ recipientId: session.actorId, store }));
+    if (body.action === "list") {
+      return Response.json({
+        ...await listGuardianInbox({ recipientId: session.actorId, store }),
+        recipientEmail: session.identityEmail ?? null
+      });
+    }
     if (body.action === "acknowledge") {
       return Response.json(await acknowledgeGuardianNotification({ recipientId: session.actorId, notificationId: body.notificationId, store }));
     }
@@ -54,12 +59,13 @@ export async function POST(request: Request) {
       from: env.GUARDIAN_DIGEST_FROM,
       email: { to: session.identityEmail, subject: digest.subject, text: digest.text }
     });
+    const sentAt = new Date().toISOString();
     await store.recordDigest({
       id: crypto.randomUUID(), recipientId: session.actorId, recipientEmail: session.identityEmail,
       notificationIds: digest.notificationIds, status: "sent", providerMessageId: delivered.providerMessageId,
-      createdAt: new Date().toISOString()
+      createdAt: sentAt
     });
-    return Response.json({ sent: true, ...delivered });
+    return Response.json({ sent: true, recipientEmail: session.identityEmail, sentAt, ...delivered });
   } catch (error) {
     logger.error("request_failed", error);
     if (error instanceof AuthenticatedSessionError) return Response.json({ error: { code: "AUTH_REQUIRED", message: error.message } }, { status: error.status });

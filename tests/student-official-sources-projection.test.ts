@@ -62,6 +62,7 @@ describe("student projection of official school sources", () => {
         timeZone: "America/Chicago",
         supportPreference: "example_first"
       },
+      externalLinkPolicy: "guardian_approval",
       now: new Date("2026-08-01T15:00:00.000Z")
     });
 
@@ -76,9 +77,10 @@ describe("student projection of official school sources", () => {
     expect(result.calendar?.items.map((item) => item.title)).not.toContain("Elementary Early Release");
     expect(result.supplies).toEqual([
       expect.objectContaining({
-        sourceUrl: "https://phs.comalisd.org/apps/pages/algebra-supplies",
+        outbound: { available: true, policy: "guardian_approval" },
         items: [expect.objectContaining({ text: "Pencils", quantity: null })]
       })
     ]);
+    expect(JSON.stringify(result)).not.toContain("algebra-supplies");
   });
 });
