@@ -15,23 +15,37 @@
 .focus button[aria-pressed="true"] { border-color: #3d735e; color: #245640; background: #eaf4ed; box-shadow: inset 0 0 0 1px #3d735e; }
 .focus button span { font-size: .68rem; }
 .focus > p { min-height: 19px; margin: 8px 0 0; color: #718178; font-size: .72rem; }
-.aiCheckIn { margin: 0 0 18px; border: 1px solid #d9e4dd; border-radius: 16px; background: #fbfdfb; }
-.aiCheckIn summary { padding: 13px 15px; color: #426052; font-size: .77rem; font-weight: 820; cursor: pointer; }
-.aiCheckIn > div { padding: 0 15px 15px; }
-.aiCheckIn label { display: block; margin: 2px 0 7px; color: #667970; font-size: .69rem; font-weight: 800; }
-.aiCheckIn textarea { box-sizing: border-box; width: 100%; resize: vertical; padding: 11px 12px; border: 1px solid #ccdbd1; border-radius: 12px; color: #263e34; background: white; font: inherit; font-size: .8rem; line-height: 1.45; }
+.aiCheckIn { margin: 26px 0 18px; padding: clamp(16px, 3vw, 22px); border: 1px solid #cdded3; border-radius: 20px; background: linear-gradient(145deg, #f8fcf8 0%, #fff 58%); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .75); }
+.aiCheckIn > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.aiCheckIn > header p { margin: 0 0 5px; color: #d26751; font-size: .62rem; font-weight: 900; letter-spacing: .14em; }
+.aiCheckIn > header h2 { margin: 0; color: #243f33; font: 600 1.15rem/1.2 Georgia, serif; }
+.aiCheckIn > header > button { padding: 7px 9px; border: 1px solid #ccdcd2; border-radius: 9px; color: #527064; background: white; font: inherit; font-size: .68rem; font-weight: 780; cursor: pointer; }
+.aiCheckIn form > label { display: block; margin: 2px 0 5px; color: #2e5141; font-size: .82rem; font-weight: 850; }
+.aiCheckIn form > p { margin: 0 0 10px; color: #708078; font-size: .69rem; line-height: 1.45; }
+.aiCheckIn textarea { box-sizing: border-box; width: 100%; resize: vertical; padding: 12px 13px; border: 1px solid #c4d7ca; border-radius: 13px; color: #263e34; background: white; font: inherit; font-size: .82rem; line-height: 1.5; }
 .aiCheckIn textarea:focus { outline: 3px solid rgba(49, 106, 81, .16); border-color: #3e745e; }
 .aiCheckIn textarea:disabled { background: #f1f4f2; }
-.aiCheckIn > div > div { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
-.aiCheckIn > div > div > span { color: #85938b; font-size: .65rem; }
-.aiCheckIn > div > div > button, .aiReply button { min-height: 38px; padding: 8px 11px; border: 0; border-radius: 10px; color: white; background: #2a624d; font: inherit; font-size: .7rem; font-weight: 820; cursor: pointer; }
+.aiCheckIn form > div { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.aiCheckIn form > div > span { color: #85938b; font-size: .65rem; }
+.aiCheckIn form > div > button, .homeroomTurn > button { min-height: 40px; padding: 8px 12px; border: 0; border-radius: 10px; color: white; background: #2a624d; font: inherit; font-size: .72rem; font-weight: 820; cursor: pointer; }
 .aiCheckIn button:disabled { opacity: .55; cursor: not-allowed; }
-.aiReply { margin-top: 12px; padding: 13px; border-left: 4px solid #5d8a70; border-radius: 10px; color: #405c4e; background: #eef6f0; }
-.aiReply p { margin: 0; font-size: .76rem; line-height: 1.48; }
-.aiReply p + p { margin-top: 6px; }
-.aiReply p strong { display: block; margin-bottom: 4px; color: #28543f; }
-.aiReply > strong { display: block; margin-top: 9px; color: #8d463b; font-size: .76rem; }
-.aiReply button { margin-top: 10px; }
+.conversation { display: grid; gap: 10px; max-height: 360px; margin-bottom: 16px; padding: 2px 3px 4px; overflow-y: auto; scroll-behavior: smooth; }
+.studentTurn, .homeroomTurn { width: min(82%, 620px); padding: 11px 13px; border-radius: 15px; }
+.studentTurn { justify-self: end; color: #284739; background: #e8f2eb; border-bottom-right-radius: 5px; }
+.homeroomTurn { justify-self: start; color: #405c4e; background: white; border: 1px solid #d7e3db; border-bottom-left-radius: 5px; box-shadow: 0 7px 18px rgba(45, 76, 61, .06); }
+.studentTurn strong, .homeroomTurn strong { font-size: .68rem; }
+.studentTurn p, .homeroomTurn p { margin: 5px 0 0; font-size: .78rem; line-height: 1.5; }
+.homeroomTurn > div { display: flex; align-items: center; gap: 8px; }
+.homeroomTurn > div strong { color: #28543f; }
+.homeroomTurn > div span { padding: 3px 6px; border-radius: 99px; color: #668073; background: #edf4ef; font-size: .58rem; font-weight: 750; }
+.homeroomTurn > button { margin-top: 10px; }
+.trustedAdult { display: block; margin-top: 9px; color: #8d463b; }
+.thinking { display: flex; align-items: center; gap: 4px; justify-self: start; padding: 9px 12px; border-radius: 13px; color: #587164; background: white; border: 1px solid #d7e3db; }
+.thinking > span { animation: thinkPulse 1.2s infinite ease-in-out; font-size: .45rem; }
+.thinking > span:nth-child(2) { animation-delay: .16s; }
+.thinking > span:nth-child(3) { animation-delay: .32s; }
+.thinking em { margin-left: 5px; font-size: .66rem; font-style: normal; }
+@keyframes thinkPulse { 0%, 65%, 100% { opacity: .25; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-2px); } }
 .aiError { margin: 9px 0 0; color: #a34238; font-size: .72rem; }
 .choice { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 16px; border: 1px solid #dbe5df; border-radius: 18px; background: white; }
 .choice[data-recommended="true"] { border-color: #c6dace; box-shadow: 0 10px 26px rgba(38, 85, 65, .08); }

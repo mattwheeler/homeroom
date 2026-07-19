@@ -64,6 +64,7 @@ export async function POST(request: Request) {
         projection,
         focusState: input.focusState,
         message: input.message,
+        history: input.history,
         client,
         traceStore: traces
       });

@@ -91,6 +91,7 @@ projection.supplies = [{
 }];
 
 test("Emily can use the complete calm student journey", async ({ page }) => {
+  let checkInTurn = 0;
   await page.route("**/api/student/bootstrap", async (route) => {
     await route.fulfill({
       status: 200,
@@ -117,11 +118,56 @@ test("Emily can use the complete calm student journey", async ({ page }) => {
       reentry: { active: false, title: "", message: "", missedDayCount: 0 }
     }) });
   });
+  await page.route("**/api/student/check-in", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-student-e2e");
+    const body = route.request().postDataJSON();
+    if (checkInTurn === 0) {
+      expect(body).toEqual({
+        focusState: null,
+        message: "I know what to do, but I cannot get started.",
+        history: []
+      });
+    } else {
+      expect(body).toEqual({
+        focusState: null,
+        message: "Choosing one packing item sounds easier.",
+        history: [
+          { role: "student", text: "I know what to do, but I cannot get started." },
+          { role: "homeroom", text: "You know the task; the hard part is crossing the starting line. Would a two-minute timer or choosing one packing item feel easier?" }
+        ]
+      });
+    }
+    checkInTurn += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        reply: {
+          message: checkInTurn === 1
+            ? "You know the task; the hard part is crossing the starting line."
+            : "Good choice. Put the instrument by the door; that is enough for this step.",
+          followUpQuestion: checkInTurn === 1
+            ? "Would a two-minute timer or choosing one packing item feel easier?"
+            : "Want to choose the next tiny item together?",
+          suggestedAction: "none"
+        },
+        proof: { mode: "live", model: "gpt-5.6-sol", responseId: "resp_checkin_e2e" }
+      })
+    });
+  });
   await page.goto("/student");
 
   await expect(page.getByRole("tab", { name: "Today" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening), Emily\./ })).toBeVisible();
   await expect(page.getByText("No guessed deadlines or events")).toBeVisible();
+  await page.getByLabel("What would you like help with right now?").fill("I know what to do, but I cannot get started.");
+  await page.getByRole("button", { name: "Talk to Homeroom" }).click();
+  await expect(page.getByText("You know the task; the hard part is crossing the starting line.")).toBeVisible();
+  await expect(page.getByText("Would a two-minute timer or choosing one packing item feel easier?")).toBeVisible();
+  await page.getByLabel("What would you like help with right now?").fill("Choosing one packing item sounds easier.");
+  await page.getByRole("button", { name: "Talk to Homeroom" }).click();
+  await expect(page.getByText("Good choice. Put the instrument by the door; that is enough for this step.")).toBeVisible();
+  await expect(page.getByText("Want to choose the next tiny item together?")).toBeVisible();
   await expect(page.getByRole("heading", { name: /One thing at a time|You’re caught up/ })).toBeVisible();
   await expect(page.getByText("You do not need to hold the whole day in your head.")).toBeVisible();
 

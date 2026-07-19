@@ -14,13 +14,18 @@ import { SessionTokenError, verifySessionToken } from "../security/session-token
 import type { SessionRecord, SessionStore } from "../storage/session-store";
 
 const requestSchema = z.object({
-  focusState: z.enum(["ready", "scattered", "low_energy"]),
-  message: z.string().trim().min(1).max(280)
+  focusState: z.enum(["ready", "scattered", "low_energy"]).nullable().optional().default(null),
+  message: z.string().trim().min(1).max(500),
+  history: z.array(z.object({
+    role: z.enum(["student", "homeroom"]),
+    text: z.string().trim().min(1).max(500)
+  }).strict()).max(10).optional().default([])
 }).strict();
 
 export interface StudentCheckInInput {
-  focusState: StudentFocusState;
+  focusState: StudentFocusState | null;
   message: string;
+  history: Array<{ role: "student" | "homeroom"; text: string }>;
 }
 
 export interface StudentCheckInHandlerDependencies {
@@ -48,7 +53,7 @@ export async function handleStudentCheckIn(
       return json({ error: { code: "RATE_LIMITED", message: "Take a short pause before checking in again." } }, 429, { "retry-after": "60" });
     }
     const length = Number(request.headers.get("content-length") ?? 0);
-    if (Number.isFinite(length) && length > 1_024) {
+    if (Number.isFinite(length) && length > 8_192) {
       return json({ error: { code: "BODY_TOO_LARGE", message: "The check-in message is too large." } }, 413);
     }
     let raw: unknown;

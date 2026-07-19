@@ -11,6 +11,18 @@ import type { StudentSourceProjection } from "../../lib/domain/student-source-pr
 import styles from "./student-daily-check-in.module.css";
 
 type FocusState = "ready" | "scattered" | "low_energy";
+type SuggestedAction = "none" | "start_recommended" | "open_planner" | "take_two_minutes" | "ask_trusted_adult";
+
+type ConversationTurn =
+  | { id: string; role: "student"; text: string }
+  | {
+      id: string;
+      role: "homeroom";
+      message: string;
+      followUpQuestion: string | null;
+      suggestedAction: SuggestedAction;
+      mode: "live" | "fallback" | "safety";
+    };
 
 const focusChoices: Array<{ id: FocusState; label: string; icon: string }> = [
   { id: "ready", label: "Ready", icon: "●" },
@@ -22,7 +34,7 @@ function supportiveLine(value: FocusState | null): string {
   if (value === "scattered") return "That’s okay. Homeroom will keep only one first step in view.";
   if (value === "low_energy") return "Thanks for saying so. A short start is enough for now.";
   if (value === "ready") return "Great. Start small, then decide what comes next.";
-  return "Pick the closest answer. There is no wrong choice.";
+  return "Optional—choose one if it helps Homeroom understand your energy.";
 }
 
 function ChoiceCard({ choice, onAction, recommended = false }: {
@@ -60,11 +72,7 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
   const [focus, setFocus] = useState<FocusState | null>(null);
   const [message, setMessage] = useState("");
   const [aiStatus, setAiStatus] = useState<"idle" | "sending" | "complete" | "error">("idle");
-  const [aiReply, setAiReply] = useState<{
-    acknowledgement: string;
-    nextStepLead: string;
-    suggestedAction: "start_recommended" | "open_planner" | "take_two_minutes" | "ask_trusted_adult";
-  } | null>(null);
+  const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [aiError, setAiError] = useState("");
   const checkIn = useMemo(
     () => buildStudentDailyCheckIn({ studentName, projection, now }),
@@ -72,32 +80,56 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
   );
 
   async function sendCheckIn() {
-    if (!focus || !message.trim() || !csrfToken || aiStatus === "sending") return;
+    const studentMessage = message.trim();
+    if (!studentMessage || !csrfToken || aiStatus === "sending") return;
+    const history = conversation.slice(-10).map((turn) => turn.role === "student"
+      ? { role: "student" as const, text: turn.text.slice(0, 500) }
+      : {
+          role: "homeroom" as const,
+          text: [turn.message, turn.followUpQuestion].filter(Boolean).join(" ").slice(0, 500)
+        });
+    setConversation((current) => [...current, {
+      id: `student-${Date.now()}`,
+      role: "student",
+      text: studentMessage
+    }]);
+    setMessage("");
     setAiStatus("sending");
     setAiError("");
     try {
       const response = await fetch("/api/student/check-in", {
         method: "POST",
         headers: { "content-type": "application/json", "x-homeroom-csrf": csrfToken },
-        body: JSON.stringify({ focusState: focus, message: message.trim() })
+        body: JSON.stringify({ focusState: focus, message: studentMessage, history })
       });
       const data = await response.json() as {
         reply?: {
-          acknowledgement?: unknown;
-          nextStepLead?: unknown;
+          message?: unknown;
+          followUpQuestion?: unknown;
           suggestedAction?: unknown;
         };
+        proof?: { mode?: unknown };
         error?: { message?: string };
       };
       if (
         !response.ok ||
-        typeof data.reply?.acknowledgement !== "string" ||
-        typeof data.reply.nextStepLead !== "string" ||
-        !["start_recommended", "open_planner", "take_two_minutes", "ask_trusted_adult"].includes(String(data.reply.suggestedAction))
+        typeof data.reply?.message !== "string" ||
+        !(data.reply.followUpQuestion === null || typeof data.reply.followUpQuestion === "string") ||
+        !["none", "start_recommended", "open_planner", "take_two_minutes", "ask_trusted_adult"].includes(String(data.reply.suggestedAction))
       ) {
         throw new Error(data.error?.message ?? "Homeroom could not respond just yet.");
       }
-      setAiReply(data.reply as NonNullable<typeof aiReply>);
+      const mode = ["live", "fallback", "safety"].includes(String(data.proof?.mode))
+        ? data.proof?.mode as "live" | "fallback" | "safety"
+        : "fallback";
+      setConversation((current) => [...current, {
+        id: `homeroom-${Date.now()}`,
+        role: "homeroom",
+        message: data.reply!.message as string,
+        followUpQuestion: data.reply!.followUpQuestion as string | null,
+        suggestedAction: data.reply!.suggestedAction as SuggestedAction,
+        mode
+      }]);
       setAiStatus("complete");
     } catch (caught) {
       setAiStatus("error");
@@ -105,13 +137,20 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
     }
   }
 
-  function useAiSuggestion() {
-    if (!aiReply) return;
-    if (aiReply.suggestedAction === "open_planner") {
+  function handleAiSuggestion(suggestedAction: SuggestedAction) {
+    if (suggestedAction === "open_planner") {
       onAction?.({ kind: "planner" });
       return;
     }
-    if (aiReply.suggestedAction !== "ask_trusted_adult") onAction?.(checkIn.recommended.action);
+    if (suggestedAction !== "none" && suggestedAction !== "ask_trusted_adult") {
+      onAction?.(checkIn.recommended.action);
+    }
+  }
+
+  function suggestionLabel(action: SuggestedAction): string {
+    if (action === "open_planner") return "Open the small planner";
+    if (action === "take_two_minutes") return "Open the first step";
+    return "Start the recommended step";
   }
 
   return (
@@ -127,47 +166,59 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
         </div>
       </div>
 
+      <section className={styles.aiCheckIn} aria-labelledby="student-ai-check-in-title">
+        <header>
+          <div><p>PRIVATE AI COACHING</p><h2 id="student-ai-check-in-title">Talk it through with Homeroom</h2></div>
+          {conversation.length > 0 && <button type="button" onClick={() => { setConversation([]); setAiError(""); }}>Start over</button>}
+        </header>
+        {conversation.length > 0 && (
+          <div className={styles.conversation} role="log" aria-live="polite" aria-label="Conversation with Homeroom">
+            {conversation.map((turn) => turn.role === "student" ? (
+              <article key={turn.id} className={styles.studentTurn}><strong>You</strong><p>{turn.text}</p></article>
+            ) : (
+              <article key={turn.id} className={styles.homeroomTurn}>
+                <div><strong>Homeroom</strong><span>{turn.mode === "live" ? "AI response" : turn.mode === "safety" ? "Safety support" : "Quick support"}</span></div>
+                <p>{turn.message}</p>
+                {turn.followUpQuestion && <p>{turn.followUpQuestion}</p>}
+                {turn.suggestedAction === "ask_trusted_adult"
+                  ? <strong className={styles.trustedAdult}>Please tell a trusted adult near you now.</strong>
+                  : turn.suggestedAction !== "none" && <button type="button" onClick={() => handleAiSuggestion(turn.suggestedAction)}>{suggestionLabel(turn.suggestedAction)}</button>}
+              </article>
+            ))}
+            {aiStatus === "sending" && <article className={styles.thinking}><span aria-hidden="true">●</span><span aria-hidden="true">●</span><span aria-hidden="true">●</span><em>Homeroom is thinking</em></article>}
+          </div>
+        )}
+        <form onSubmit={(event) => { event.preventDefault(); void sendCheckIn(); }}>
+          <label htmlFor="student-check-in-message">What would you like help with right now?</label>
+          <p>You can type first or add an optional focus signal below. Your conversation stays in this browser session.</p>
+          <textarea
+            id="student-check-in-message"
+            value={message}
+            maxLength={500}
+            rows={3}
+            disabled={aiStatus === "sending"}
+            placeholder={conversation.length > 0 ? "Reply to Homeroom…" : "For example: I know what to do, but I can’t get started."}
+            onChange={(event) => setMessage(event.target.value)}
+          />
+          <div><span>{message.length}/500</span><button type="submit" disabled={!message.trim() || !csrfToken || aiStatus === "sending"}>{aiStatus === "sending" ? "Homeroom is thinking…" : "Talk to Homeroom"}</button></div>
+          {aiError && <p className={styles.aiError} role="alert">{aiError}</p>}
+        </form>
+      </section>
+
       <fieldset className={styles.focus}>
-        <legend>How is your focus right now?</legend>
+        <legend>How is your focus right now? (optional)</legend>
         <div>
           {focusChoices.map((choice) => (
             <button
               key={choice.id}
               type="button"
               aria-pressed={focus === choice.id}
-              onClick={() => setFocus(choice.id)}
+              onClick={() => setFocus((current) => current === choice.id ? null : choice.id)}
             ><span aria-hidden="true">{choice.icon}</span>{choice.label}</button>
           ))}
         </div>
         <p aria-live="polite">{supportiveLine(focus)}</p>
       </fieldset>
-
-      <details className={styles.aiCheckIn}>
-        <summary>Tell Homeroom what’s making it hard to start</summary>
-        <div>
-          <label htmlFor="student-check-in-message">One short message</label>
-          <textarea
-            id="student-check-in-message"
-            value={message}
-            maxLength={280}
-            rows={3}
-            disabled={!focus || aiStatus === "sending"}
-            placeholder={focus ? "For example: I know what to do, but I can’t get started." : "Choose how your focus feels first."}
-            onChange={(event) => setMessage(event.target.value)}
-          />
-          <div><span>{message.length}/280</span><button type="button" disabled={!focus || !message.trim() || !csrfToken || aiStatus === "sending"} onClick={() => void sendCheckIn()}>{aiStatus === "sending" ? "Thinking…" : "Check in with Homeroom"}</button></div>
-          {aiError && <p className={styles.aiError} role="alert">{aiError}</p>}
-          {aiReply && (
-            <section className={styles.aiReply} aria-live="polite">
-              <p><strong>Homeroom</strong>{aiReply.acknowledgement}</p>
-              <p>{aiReply.nextStepLead}</p>
-              {aiReply.suggestedAction === "ask_trusted_adult"
-                ? <strong>Please tell a trusted adult near you now.</strong>
-                : <button type="button" onClick={useAiSuggestion}>{aiReply.suggestedAction === "open_planner" ? "Open the small planner" : aiReply.suggestedAction === "take_two_minutes" ? "Try a two-minute start" : "Start the recommended step"}</button>}
-            </section>
-          )}
-        </div>
-      </details>
 
       <ChoiceCard choice={checkIn.recommended} onAction={onAction} recommended />
 
