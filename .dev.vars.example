@@ -1,4 +1,5 @@
 SESSION_SIGNING_SECRET=replace-with-at-least-32-random-characters
+OPENAI_API_KEY=replace-with-openai-api-key-for-live-model-turns
 SOURCE_TOKEN_ENCRYPTION_KEY=replace-with-a-different-32-character-random-secret
 GOOGLE_CLASSROOM_CLIENT_ID=replace-with-google-oauth-web-client-id
 GOOGLE_CLASSROOM_CLIENT_SECRET=replace-with-google-oauth-web-client-secret

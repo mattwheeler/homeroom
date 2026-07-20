@@ -1,6 +1,10 @@
 # Homeroom
 
+[![Verify](https://github.com/mattwheeler/homeroom/actions/workflows/verify.yml/badge.svg?branch=codex%2Ffoundation)](https://github.com/mattwheeler/homeroom/actions/workflows/verify.yml)
+
 Homeroom is a guardian-connected AI workspace for K–12 students. It turns read-only school records, calendars, and family logistics into a calm, age-appropriate next step while keeping the student in control.
+
+**[Open the live Build Week application](https://homeroom-build-week.riseuplabs-homeroom.workers.dev)** · Reviewers receive the temporary access code in Devpost's judges-only testing instructions.
 
 This repository contains the public OpenAI Build Week prototype: application source, migrations, tests, security guidance, and reproducible setup instructions. Internal planning, release operations, judge handoff, and submission production materials are maintained outside the public repository.
 
@@ -47,7 +51,9 @@ The application—not the model—owns permissions, source normalization, state 
 
 ## How Codex and GPT-5.6 were used
 
-Codex served as the implementation partner across product specification, interface iteration, integration debugging, database migrations, security hardening, testing, and documentation. The resulting behavior is preserved as normal reviewable source code and automated verification rather than hidden in an unreproducible prompt workflow.
+Codex was the engineering collaborator from the first implementation commit through code freeze. We worked spec-first: product decisions became explicit, testable experience contracts and state machines before they became interfaces. We worked test-first: Codex wrote failing tests around trust boundaries such as approval receipts, source adapters, identity, and role separation, then implemented against them. That discipline is why the repository ships more than 430 automated tests with enforced coverage thresholds rather than adding tests after the demo was complete.
+
+Codex also drove the work that is easy to skip in a hackathon and expensive to skip in a product: D1 migrations, per-redirect SSRF validation for external sources, CSRF and same-origin hardening, D1-backed rate limiting, accessibility checks, and release verification. The implementation arc is visible on the [`codex/foundation`](https://github.com/mattwheeler/homeroom/commits/codex/foundation/) branch, and every pushed change is protected by the same CI gate. Its most valuable contribution was not only speed; it was forcing product intent to become a verifiable contract before it became code.
 
 GPT-5.6 Sol powers bounded proposal and coaching tasks:
 
