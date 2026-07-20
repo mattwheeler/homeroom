@@ -50,6 +50,22 @@ export interface SourceSnapshot {
   events: BandCalendarEvent[];
 }
 
+export interface SourceEventWindow {
+  fromDate: string;
+  throughDate: string;
+  limit: number;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1_000;
+
+export function activeSourceEventWindow(now: Date): SourceEventWindow {
+  return {
+    fromDate: new Date(now.getTime() - (31 * DAY_MS)).toISOString().slice(0, 10),
+    throughDate: new Date(now.getTime() + (370 * DAY_MS)).toISOString().slice(0, 10),
+    limit: 180
+  };
+}
+
 interface OAuthStateRow {
   id: string;
   state_hash: string;
@@ -306,8 +322,8 @@ export class D1SourceConnectionStore {
     assertBatch(await batch(statements), statements.length, "Unable to save the BAND calendar snapshot.");
   }
 
-  async getStudentSnapshot(studentId: string): Promise<SourceSnapshot> {
-    const connections = await this.database.prepare(
+  async getStudentSnapshot(studentId: string, eventWindow?: SourceEventWindow): Promise<SourceSnapshot> {
+    const connectionsPromise = this.database.prepare(
       `SELECT COALESCE(json_group_array(json_object(
         'provider', provider,
         'status', status,
@@ -317,7 +333,7 @@ export class D1SourceConnectionStore {
       )), '[]') AS records_json
       FROM source_connections WHERE student_id = ?`
     ).bind(studentId).first<AggregateRow>();
-    const courses = await this.database.prepare(
+    const coursesPromise = this.database.prepare(
       `SELECT COALESCE(json_group_array(json_object(
         'provider', provider,
         'externalId', external_id,
@@ -331,7 +347,7 @@ export class D1SourceConnectionStore {
       )), '[]') AS records_json
       FROM source_courses WHERE student_id = ? ORDER BY name`
     ).bind(studentId).first<AggregateRow>();
-    const coursework = await this.database.prepare(
+    const courseworkPromise = this.database.prepare(
       `SELECT COALESCE(json_group_array(json_object(
         'provider', provider,
         'externalId', external_id,
@@ -348,8 +364,7 @@ export class D1SourceConnectionStore {
       )), '[]') AS records_json
       FROM source_coursework WHERE student_id = ? ORDER BY due_date, due_time`
     ).bind(studentId).first<AggregateRow>();
-    const events = await this.database.prepare(
-      `SELECT COALESCE(json_group_array(json_object(
+    const eventProjection = `SELECT COALESCE(json_group_array(json_object(
         'provider', provider,
         'uid', uid,
         'title', title,
@@ -360,9 +375,27 @@ export class D1SourceConnectionStore {
         'allDay', CASE WHEN all_day = 1 THEN json('true') ELSE json('false') END,
         'status', status,
         'sourceUpdatedAt', source_updated_at
-      )), '[]') AS records_json
-      FROM source_calendar_events WHERE student_id = ? ORDER BY starts_at`
-    ).bind(studentId).first<AggregateRow>();
+      )), '[]') AS records_json`;
+    const eventsPromise = eventWindow
+      ? this.database.prepare(
+        `${eventProjection} FROM (
+          SELECT provider, uid, title, description, location, starts_at, ends_at,
+            all_day, status, source_updated_at
+          FROM source_calendar_events
+          WHERE student_id = ? AND substr(starts_at, 1, 10) BETWEEN ? AND ?
+          ORDER BY starts_at
+          LIMIT ?
+        )`
+      ).bind(studentId, eventWindow.fromDate, eventWindow.throughDate, eventWindow.limit).first<AggregateRow>()
+      : this.database.prepare(
+        `${eventProjection} FROM source_calendar_events WHERE student_id = ? ORDER BY starts_at`
+      ).bind(studentId).first<AggregateRow>();
+    const [connections, courses, coursework, events] = await Promise.all([
+      connectionsPromise,
+      coursesPromise,
+      courseworkPromise,
+      eventsPromise
+    ]);
     return {
       connections: JSON.parse(connections?.records_json ?? "[]") as PublicSourceConnection[],
       courses: JSON.parse(courses?.records_json ?? "[]") as ClassroomCourse[],

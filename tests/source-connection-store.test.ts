@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ClassroomSnapshot } from "../lib/source/google-classroom";
 import {
+  activeSourceEventWindow,
   D1SourceConnectionStore,
   SourceConnectionStoreError,
   type SourceConnectionRecord
@@ -145,6 +146,29 @@ describe("D1 read-only source connection store", () => {
     expect(result.connections).toEqual([expect.objectContaining({ provider: "google_classroom" })]);
     expect(result.courses).toEqual(snapshot.courses);
     expect(JSON.stringify(result)).not.toContain("secretCiphertext");
+  });
+
+  it("bounds calendar projections without changing the stored source", async () => {
+    const { database, calls } = fakeDatabase([
+      { records_json: "[]" },
+      { records_json: "[]" },
+      { records_json: "[]" },
+      { records_json: "[]" }
+    ]);
+    const window = activeSourceEventWindow(new Date("2026-07-20T12:00:00.000Z"));
+
+    await new D1SourceConnectionStore(database).getStudentSnapshot("student_emily", window);
+
+    const eventCall = calls.find((call) => call.sql.includes("source_calendar_events"));
+    expect(window).toEqual({ fromDate: "2026-06-19", throughDate: "2027-07-25", limit: 180 });
+    expect(eventCall?.sql).toContain("substr(starts_at, 1, 10) BETWEEN ? AND ?");
+    expect(eventCall?.sql).toContain("LIMIT ?");
+    expect(eventCall?.values).toEqual([
+      "student_emily",
+      "2026-06-19",
+      "2027-07-25",
+      180
+    ]);
   });
 
   it("fails closed when atomic batch support is unavailable", async () => {

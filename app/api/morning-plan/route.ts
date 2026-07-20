@@ -12,7 +12,10 @@ import { D1FixedWindowRateLimiter } from "../../../lib/security/rate-limit";
 import { D1AiTurnStore } from "../../../lib/storage/ai-turn-store";
 import { D1LiveDayPlanStore } from "../../../lib/storage/live-day-plan-store";
 import { D1SessionStore } from "../../../lib/storage/session-store";
-import { D1SourceConnectionStore } from "../../../lib/storage/source-connection-store";
+import {
+  activeSourceEventWindow,
+  D1SourceConnectionStore
+} from "../../../lib/storage/source-connection-store";
 import { D1SchoolSourceStore } from "../../../lib/storage/school-source-store";
 import { StructuredLogger } from "../../../lib/observability/logger";
 
@@ -35,17 +38,21 @@ export async function POST(request: Request) {
     logger: new StructuredLogger("morning-plan"),
     generate: async (session) => {
       const studentId = session.studentId ?? session.actorId;
+      const now = new Date();
       const [snapshot, schoolSnapshot] = await Promise.all([
-        new D1SourceConnectionStore(env.HOMEROOM_DB).getStudentSnapshot(studentId),
+        new D1SourceConnectionStore(env.HOMEROOM_DB).getStudentSnapshot(
+          studentId,
+          activeSourceEventWindow(now)
+        ),
         new D1SchoolSourceStore(env.HOMEROOM_DB).getStudentSnapshot(studentId)
       ]);
       const projection = projectStudentSources({
         snapshot,
         schoolSnapshot,
         profile: { ...emilyStudentSupportProfile, timeZone: emilyFixture.timeZone, supportPreference: "example_first" },
-        now: new Date()
+        now
       });
-      const liveContext = await buildLivePlanContext(projection, new Date());
+      const liveContext = await buildLivePlanContext(projection, now);
       const generated = await generateMorningPlan({ session, client, traceStore, liveContext });
       const staged = await stageLiveDayPlan({
         session,
