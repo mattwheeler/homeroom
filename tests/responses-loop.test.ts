@@ -43,12 +43,31 @@ describe("Responses API continuation loop", () => {
       reasoning: { effort: "low", context: "current_turn" },
       store: false,
       text: { verbosity: "low" },
+      max_output_tokens: 500,
       parallel_tool_calls: true
     });
     const secondInput = create.mock.calls[1][0].input;
     expect(secondInput).toContainEqual(
       expect.objectContaining({ type: "function_call_output", call_id: "call_courses" })
     );
+  });
+
+  it("honors a larger bounded output budget for structured stages", async () => {
+    const create = vi.fn().mockResolvedValue({
+      id: "resp_plan",
+      model: "gpt-5.6-sol",
+      output: [{ type: "message", content: [{ type: "output_text", text: "{}" }] }]
+    });
+
+    await runResponsesTurn({
+      client: { create },
+      stage: "morning_plan",
+      userInput: "Build the plan.",
+      toolExecutor: vi.fn(),
+      maxOutputTokens: 900
+    });
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ max_output_tokens: 900 }));
   });
 
   it("rejects a tool that is unavailable for the stage", async () => {

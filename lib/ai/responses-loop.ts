@@ -49,6 +49,7 @@ export async function runResponsesTurn(input: {
   safetyIdentifier?: string;
   toolExecutor: (name: string, args: unknown) => Promise<unknown>;
   maxRounds?: number;
+  maxOutputTokens?: number;
 }) {
   const conversation: Array<Record<string, unknown>> = [
     { role: "user", content: input.userInput }
@@ -64,7 +65,7 @@ export async function runResponsesTurn(input: {
       reasoning: { effort: "low", context: "current_turn" },
       store: false,
       text: { verbosity: "low", ...(input.responseFormat ? { format: input.responseFormat } : {}) },
-      max_output_tokens: 500,
+      max_output_tokens: input.maxOutputTokens ?? 500,
       tools: getStageTools(input.stage),
       tool_choice: "auto",
       parallel_tool_calls: isReadOnlyStage(input.stage),
