@@ -12,7 +12,7 @@ The seeder is intentionally separate from Homeroom's read-only OAuth application
 4. Replace the editor's `Code.gs` and `appsscript.json` contents with the matching files from this directory.
 5. In **Project Settings → Script Properties**, add:
    - Property: `HOMEROOM_DEMO_STUDENT_EMAIL`
-   - Value: the separate personal Google account that will act as Emily.
+   - Value: the separate personal Google account that will act as the fictional demo student.
 6. Run `previewHomeroomSandbox` first. It performs no writes and lists the seven planned classes.
 7. Run `seedHomeroomSandbox`. Review and approve the three teacher scopes when Google asks. For a personal Gmail teacher, this first pass creates all seven provisioned classes and logs the required acceptance step.
 8. Open [Google Classroom](https://classroom.google.com/) as the sandbox teacher and click **Accept** on all seven provisioned class cards.
