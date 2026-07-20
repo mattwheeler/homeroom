@@ -124,9 +124,9 @@ No known critical or high-severity release blocker remains. Production use with 
 - `docs/devpost-submission-runbook.md` maps every live Devpost field to a verified answer or explicit owner decision.
 - `docs/demo-video-script.md` provides the final sub-three-minute voiceover and shot list aligned to the judging criteria.
 
-### User decision still required
+### License
 
-- The repository intentionally has no license until the owner selects one. Devpost requires the relevant license choice. MIT is the simplest permissive option, but that legal/product decision belongs to the owner.
+- The owner approved the MIT License on 2026-07-20. The repository now includes the required public open-source license.
 
 ## Product, feature, and data audit
 
@@ -194,7 +194,7 @@ Do not spend video time touring every setting. The differentiator is the connect
 
 ### Must complete before Devpost submission
 
-- [ ] select and add the repository license;
+- [x] select and add the repository license;
 - [ ] record and upload the final video (under three minutes);
 - [x] add the public Worker and GitHub links;
 - [ ] add the private judge code and testing instructions;

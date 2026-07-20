@@ -75,7 +75,7 @@ security find-generic-password -a "$(id -un)" -s homeroom-build-week-judge -w
 ## Final owner checklist
 
 - [ ] Confirm every teammate is present on Devpost and has accepted the invitation.
-- [ ] Choose and add the repository license.
+- [x] Choose and add the repository license (MIT).
 - [ ] Record, upload, and attach the public YouTube video.
 - [ ] Add the `/feedback` Session ID.
 - [ ] Select the correct submitter type.
@@ -83,4 +83,3 @@ security find-generic-password -a "$(id -un)" -s homeroom-build-week-judge -w
 - [ ] Upload a 3:2 thumbnail and selected gallery images.
 - [ ] Preview the public project page and test every link in an incognito browser.
 - [ ] Submit before the deadline and capture the confirmation.
-
