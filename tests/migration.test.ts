@@ -95,4 +95,12 @@ describe("D1 foundation migration", () => {
     expect(sql).toContain("ADD COLUMN student_id");
     expect(sql).toContain("ADD COLUMN item_kind");
   });
+
+  it("adds a non-destructive identity column for time-limited judge access", async () => {
+    const sql = await readFile(new URL("../migrations/0011_reviewer_identity_provider.sql", import.meta.url), "utf8");
+    expect(sql).toContain("ADD COLUMN identity_provider_v2");
+    expect(sql).toContain("IN ('google', 'judge')");
+    expect(sql).toContain("SET identity_provider_v2 = identity_provider");
+    expect(sql).not.toContain("DROP TABLE");
+  });
 });

@@ -167,7 +167,7 @@ The current UI refreshes both sources on explicit student action and synchronize
 
 Before exposing a persistent judge URL:
 
-1. apply every D1 migration, including `0010_focus_session_context.sql`, to the remote `homeroom-build-week` database;
+1. apply every D1 migration, including `0011_reviewer_identity_provider.sql`, to the remote `homeroom-build-week` database;
 2. configure the production Google identity and Classroom callback URLs and exact student/guardian email allowlists;
 3. set `SESSION_SIGNING_SECRET`, `SOURCE_TOKEN_ENCRYPTION_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `GUARDIAN_DIGEST_FROM`, `CRON_SECRET`, and `JUDGE_ACCESS_CODE` as Worker secrets;
 4. verify the sending domain in Resend before enabling the weekly guardian digest;

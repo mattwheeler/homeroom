@@ -83,9 +83,9 @@ export class D1SessionStore implements ReusableSessionStore {
         `INSERT INTO demo_sessions (
           id, seed_key, actor_id, role, state_json, state_version, source_version,
           active_plan_version, csrf_hash, expires_at, created_at, updated_at,
-          identity_provider, identity_subject, identity_email,
+          identity_provider, identity_provider_v2, identity_subject, identity_email,
           principal_id, household_id, student_id, guardian_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         record.id,
@@ -100,6 +100,7 @@ export class D1SessionStore implements ReusableSessionStore {
         record.expiresAt,
         record.createdAt,
         record.updatedAt,
+        record.identityProvider === "google" ? "google" : null,
         record.identityProvider ?? null,
         record.identitySubject ?? null,
         record.identityEmail ?? null,
@@ -116,7 +117,9 @@ export class D1SessionStore implements ReusableSessionStore {
     const row = await this.database
       .prepare(
         `SELECT id, seed_key, actor_id, role, state_json, csrf_hash,
-          expires_at, created_at, updated_at, identity_provider, identity_subject, identity_email,
+          expires_at, created_at, updated_at,
+          COALESCE(identity_provider_v2, identity_provider) AS identity_provider,
+          identity_subject, identity_email,
           principal_id, household_id, student_id, guardian_id
         FROM demo_sessions WHERE id = ? LIMIT 1`
       )

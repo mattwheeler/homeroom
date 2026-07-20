@@ -22,7 +22,7 @@ npx wrangler d1 migrations list homeroom-build-week --remote
 npx wrangler d1 migrations apply homeroom-build-week --remote
 ```
 
-The current release requires `0010_focus_session_context.sql`.
+The current release requires `0011_reviewer_identity_provider.sql`.
 
 ## 3. Required Worker secrets
 

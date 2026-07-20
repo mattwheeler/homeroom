@@ -140,7 +140,7 @@ describe("D1 session store", () => {
     expect(await store.findById("session_01")).toEqual(record);
     await store.updateCsrfHash("session_01", "rotated-hash", "2026-07-18T12:05:00.000Z");
     expect(calls).toHaveLength(3);
-    expect(calls[0]?.sql).toContain("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    expect(calls[0]?.sql).toContain("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     expect(calls[1]?.sql).toContain("WHERE id = ?");
     expect(calls[1]?.values).toEqual(["session_01"]);
     expect(calls[2]?.sql).toContain("UPDATE demo_sessions SET csrf_hash = ?");
