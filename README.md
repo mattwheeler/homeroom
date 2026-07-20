@@ -176,7 +176,7 @@ Before exposing a persistent judge URL:
 
 No remote migration, deployment, or outbound email is performed by the local setup commands.
 
-Release operations and judge testing are documented in [`docs/release-runbook.md`](docs/release-runbook.md) and [`docs/judge-guide.md`](docs/judge-guide.md). Security boundaries and reporting are documented in [`SECURITY.md`](SECURITY.md).
+Release operations and judge testing are documented in [`docs/release-runbook.md`](docs/release-runbook.md) and [`docs/judge-guide.md`](docs/judge-guide.md). The final Devpost field map and video plan are in [`docs/devpost-submission-runbook.md`](docs/devpost-submission-runbook.md) and [`docs/demo-video-script.md`](docs/demo-video-script.md). Security boundaries and reporting are documented in [`SECURITY.md`](SECURITY.md).
 
 Official provider references:
 

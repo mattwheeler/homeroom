@@ -4,7 +4,7 @@
 
 Homeroom is a credible Build Week release candidate, not a clickable concept. Its strongest competitive argument is the complete student–guardian loop: authenticated household roles, real read-only school sources, bounded AI coaching, explicit approvals, persisted student progress, guardian-visible coarse progress, and student-controlled family sharing all operate in the same product.
 
-The release gate is green locally. The public Worker, D1, production secrets, migrations, Google callbacks, Resend domain, and scheduled trigger are configured. Final deployed-origin evidence is recorded after the release candidate is published.
+The release gate is green locally and on the deployed origin. The public Worker, D1, production secrets, migrations, Google callbacks, Resend domain, and scheduled trigger are configured. Release `323ec4cbc84f17f30a6628a42199f08169d7e2f6` is live as Cloudflare Worker version `d0c9c58c-643d-4a37-a6e3-e1075b173467` (the code release plus the final cron-secret rotation).
 
 ### Scorecard
 
@@ -27,12 +27,28 @@ This score does not predict placement in a large field. It says the build has th
 - dependency audit: **0 vulnerabilities**;
 - TypeScript: passed;
 - ESLint: passed with zero warnings;
-- Vitest: **429/429 tests passed** across 100 files;
-- coverage: **88.40% statements, 80.22% branches, 91.92% functions, 90.77% lines**;
+- Vitest: **430/430 tests passed** across 100 files;
+- coverage: **88.40% statements, 80.23% branches, 91.92% functions, 90.77% lines**;
 - production Vinext/Cloudflare build: passed; and
 - Playwright: **6/6 desktop and mobile journeys passed**.
 
 The browser gate includes horizontal-overflow checks, serious/critical WCAG 2 A/AA scanning, keyboard-operable judge access, and the complete student journey.
+
+### Deployed-origin evidence
+
+The final release was exercised against `https://homeroom-build-week.riseuplabs-homeroom.workers.dev` on 2026-07-20:
+
+- `/api/health`: D1 ready and exact release SHA reported;
+- public root: HTTP 200 with CSP, HSTS, frame denial, nosniff, Referrer-Policy, Permissions-Policy, COOP, and CORP;
+- student judge identity and bootstrap: HTTP 200 with seven connected classes and the bounded live calendar projection;
+- live GPT-5.6 morning plan: HTTP 200 after the structured-output regression fix;
+- guardian judge identity and product session: HTTP 200/201;
+- guardian workspace: HTTP 200 with Emily and four configured source categories;
+- guardian inbox and approved-only digest preview: HTTP 200;
+- authenticated cron route: HTTP 200 with zero eligible recipients and zero deliveries; and
+- Worker tail: all exercised routes completed normally, with no CPU-limit or unhandled exception.
+
+There were no unread student-approved guardian notes during the freeze smoke, so the release did not manufacture a reminder or send a content-free email merely to produce evidence. Reminder delivery, acknowledgement, and digest inclusion remain covered by the automated suite.
 
 ## Infrastructure and deployment audit
 
@@ -104,7 +120,9 @@ No known critical or high-severity release blocker remains. Production use with 
 - `docs/judge-guide.md` provides one concise student/guardian walkthrough through the real product routes.
 - `SECURITY.md` and vulnerability reporting are present.
 - GitHub is public with project description and deployed homepage.
-- Confluence contains the Homeroom specification and decision history; this audit is published as a dated status page under the Build Week workspace.
+- Confluence contains the Homeroom specification and decision history; this audit is mirrored as the dated [Code Freeze & Submission Readiness](https://riseuplabsllc.atlassian.net/wiki/spaces/OBW/pages/74448897/Homeroom+Code+Freeze+Submission+Readiness+2026-07-20) page under the Build Week workspace.
+- `docs/devpost-submission-runbook.md` maps every live Devpost field to a verified answer or explicit owner decision.
+- `docs/demo-video-script.md` provides the final sub-three-minute voiceover and shot list aligned to the judging criteria.
 
 ### User decision still required
 
@@ -169,16 +187,16 @@ Do not spend video time touring every setting. The differentiator is the connect
 - [x] full local release gate;
 - [x] remove the AI Worker SDK CPU overhead;
 - [x] bound the live source projection without deleting provider data;
-- [ ] deploy the release candidate and stamp its commit in `/api/health`;
-- [ ] run repeated student/guardian deployed-origin smoke checks;
-- [ ] verify the authenticated scheduled digest endpoint; and
-- [ ] confirm no Worker CPU-limit event during the smoke.
+- [x] deploy the release candidate and stamp its commit in `/api/health`;
+- [x] run repeated student/guardian deployed-origin smoke checks;
+- [x] verify the authenticated scheduled digest endpoint; and
+- [x] confirm no Worker CPU-limit event during the smoke.
 
 ### Must complete before Devpost submission
 
 - [ ] select and add the repository license;
 - [ ] record and upload the final video (under three minutes);
-- [ ] add the public Worker and GitHub links;
+- [x] add the public Worker and GitHub links;
 - [ ] add the private judge code and testing instructions;
 - [ ] add the correct `/feedback` session ID;
 - [ ] upload thumbnail/gallery media;
