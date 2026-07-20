@@ -67,7 +67,7 @@ describe("independent Family reminder", () => {
       task: { id: "google_classroom:coursework:physical_form", label: "Band physical form", dueAt: "2026-07-24T17:00:00" },
       source: { provider: "google_classroom", externalId: "physical_form", label: "Concert Band - Period 6 · Google Classroom" },
       title: "Band physical form may need your help",
-      message: "Emily found a source-backed Concert Band - Period 6 item that may need a parent or guardian: Band physical form. It is due Friday, July 24.",
+      message: "Emily asked for help with Band physical form in Concert Band - Period 6. It is due Friday, July 24.",
       createdAt: "2026-07-18T12:01:00.000Z"
     });
     expect(result.proof).toEqual({ independentTrack: "family", stateUnchanged: true, stateVersion: 5 });

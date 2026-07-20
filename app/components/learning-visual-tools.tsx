@@ -314,7 +314,7 @@ export function SubjectVisualScaffold({
         ) : <ScaffoldDiagram coachMode={coachMode} />}
       </div>
       <p>{visualScaffold ? "Use each visible part to plan your next response." : fallback.prompt}</p>
-      <small>Use the model to support your thinking—not to skip the thinking.</small>
+      <small>Use this guide to help with your own answer.</small>
       <span className="visually-hidden">Learning phase: {phase.replace("_", " ")}</span>
     </figure>
   );

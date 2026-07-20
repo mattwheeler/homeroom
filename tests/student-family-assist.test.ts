@@ -24,7 +24,7 @@ describe("student-controlled family help", () => {
     const html = renderToStaticMarkup(createElement(StudentFamilyAssist, { csrfToken: "csrf", candidate }));
 
     expect(html).toContain("Something Matt may need to handle");
-    expect(html).toContain("Homeroom noticed a guardian-only step");
+    expect(html).toContain("Preview the message before sending it");
     expect(html).toContain("Ask Matt about this");
     expect(html).not.toContain("Approve and notify Matt");
   });

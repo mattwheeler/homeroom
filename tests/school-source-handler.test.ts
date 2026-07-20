@@ -90,6 +90,7 @@ describe("official school source HTTP boundary", () => {
       signingSecret,
       rateLimiter: allow,
       clientKey: "student",
+      now: () => new Date("2026-07-19T18:01:00.000Z"),
       connectCalendar: vi.fn(),
       connectSupplies,
       sync: vi.fn()

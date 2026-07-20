@@ -1,4 +1,19 @@
 .checkIn { width: min(920px, 100%); margin: 0 auto 26px; padding: clamp(20px, 4vw, 32px); border: 1px solid #d9e5de; border-radius: 26px; background: linear-gradient(135deg, #fff 0%, #f8fbf8 100%); box-shadow: 0 18px 50px rgba(34, 75, 58, .08); }
+.unifiedCheckIn { width: min(1120px, 100%); margin-bottom: 0; padding: 20px 24px; }
+.unifiedCheckIn .heading { margin-bottom: 14px !important; }
+.workspaceBody { display: flex; flex-direction: column; gap: 12px; }
+.primarySlot { min-width: 0; }
+.workspaceBody .aiCheckIn { box-sizing: border-box; height: auto; margin: 0; padding: 15px 18px; }
+.unifiedCheckIn .aiCheckIn > header { margin-bottom: 10px; }
+.unifiedCheckIn .aiCheckIn > header h2 { font-size: 1.08rem; }
+.unifiedCheckIn .checkInPrompt { font-size: .78rem; }
+.unifiedCheckIn .aiCheckIn form > p { margin-bottom: 8px; }
+.unifiedCheckIn .focusStarters { margin-bottom: 0; }
+.unifiedCheckIn .focusStarters legend { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.unifiedCheckIn .focusStarters > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.unifiedCheckIn .focusStarters button { display: inline-flex; width: auto; align-items: center; gap: 7px; padding: 8px 11px; border-radius: 999px; }
+.unifiedCheckIn .focusStarters button > span { grid-row: auto; padding-top: 0; }
+.unifiedCheckIn .focusStarters button strong { font-size: .72rem; white-space: nowrap; }
 .heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .heading p { margin: 0 0 8px; color: #d46650; font-size: .69rem; font-weight: 900; letter-spacing: .15em; }
 .heading h1 { margin: 0; color: #193047; font: 500 clamp(2rem, 5vw, 3.2rem)/1 Georgia, serif; letter-spacing: -.045em; }
@@ -13,7 +28,7 @@
 .aiCheckIn > header p { margin: 0 0 5px; color: #d26751; font-size: .62rem; font-weight: 900; letter-spacing: .14em; }
 .aiCheckIn > header h2 { margin: 0; color: #243f33; font: 600 1.15rem/1.2 Georgia, serif; }
 .aiCheckIn > header > button { padding: 7px 9px; border: 1px solid #ccdcd2; border-radius: 9px; color: #527064; background: white; font: inherit; font-size: .68rem; font-weight: 780; cursor: pointer; }
-.aiCheckIn form > label { display: block; margin: 2px 0 5px; color: #2e5141; font-size: .82rem; font-weight: 850; }
+.checkInPrompt { display: block; margin: 2px 0 5px; color: #2e5141; font-size: .82rem; font-weight: 850; }
 .aiCheckIn form > p { margin: 0 0 10px; color: #708078; font-size: .69rem; line-height: 1.45; }
 .focusStarters { margin: 0 0 12px; padding: 0; border: 0; }
 .focusStarters legend { margin-bottom: 8px; color: #526d60; font-size: .68rem; font-weight: 820; }
@@ -24,12 +39,13 @@
 .focusStarters button strong { font-size: .72rem; }
 .focusStarters button small { color: #718178; font-size: .62rem; line-height: 1.35; }
 .focusStarters button[aria-pressed="true"] small { color: #557164; }
+.composer { margin-top: 10px; }
 .aiCheckIn textarea { box-sizing: border-box; width: 100%; resize: vertical; padding: 12px 13px; border: 1px solid #c4d7ca; border-radius: 13px; color: #263e34; background: white; font: inherit; font-size: .82rem; line-height: 1.5; }
 .aiCheckIn textarea:focus { outline: 3px solid rgba(49, 106, 81, .16); border-color: #3e745e; }
 .aiCheckIn textarea:disabled { background: #f1f4f2; }
-.aiCheckIn form > div { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
-.aiCheckIn form > div > span { color: #85938b; font-size: .65rem; }
-.aiCheckIn form > div > button, .homeroomTurn > button { min-height: 40px; padding: 8px 12px; border: 0; border-radius: 10px; color: white; background: #2a624d; font: inherit; font-size: .72rem; font-weight: 820; cursor: pointer; }
+.composer > div { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.composer > div > span { color: #85938b; font-size: .65rem; }
+.composer > div > button, .homeroomTurn > button { min-height: 40px; padding: 8px 12px; border: 0; border-radius: 10px; color: white; background: #2a624d; font: inherit; font-size: .72rem; font-weight: 820; cursor: pointer; }
 .aiCheckIn button:disabled { opacity: .55; cursor: not-allowed; }
 .conversation { display: grid; gap: 10px; max-height: 360px; margin-bottom: 16px; padding: 2px 3px 4px; overflow-y: auto; scroll-behavior: smooth; }
 .studentTurn, .homeroomTurn { width: min(82%, 620px); padding: 11px 13px; border-radius: 15px; }

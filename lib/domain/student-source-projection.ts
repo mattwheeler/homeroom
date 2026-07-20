@@ -17,6 +17,12 @@ import {
   type StudentOutboundResource
 } from "./student-external-links";
 import type { OfficialSupplyItem } from "../source/official-school-supplies";
+import {
+  buildTaskSessionPlan,
+  classifyTaskSessionKind,
+  type TaskSessionKind,
+  type TaskSessionStep
+} from "./task-session-plan";
 
 export type StudentProjectionProfile = StudentSupportProfile & {
   timeZone: string;
@@ -63,16 +69,21 @@ export interface ProjectedPriority {
     summary: string;
     signals: string[];
   };
-  chunks: Array<{
-    id: string;
-    order: 1 | 2 | 3;
-    label: string;
-    action: string;
-    minutes: number;
-    skill: ExecutiveSkill;
-    visualState: "ready" | "next" | "check";
-  }>;
+  sessionPlan?: { kind: TaskSessionKind; maxSteps: number };
+  chunks: TaskSessionStep[];
   source: ProjectionEvidence;
+}
+
+export interface ProjectedCourseworkStatus {
+  taskId: string;
+  externalId: string;
+  title: string;
+  courseExternalId: string;
+  courseName: string | null;
+  state: string | null;
+  label: string;
+  isSourceComplete: boolean;
+  sourceUpdatedAt: string | null;
 }
 
 export interface ProjectedSourceClass {
@@ -158,6 +169,7 @@ export interface StudentSourceProjection {
     days: Array<{ date: string; label: string; items: WeekItem[] }>;
   };
   priorities: ProjectedPriority[];
+  courseworkStatuses?: ProjectedCourseworkStatus[];
   learningRecommendations: LearningRecommendation[];
   guardianAssistCandidates?: ProjectedGuardianAssist[];
   classes?: ProjectedSourceClass[];
@@ -368,64 +380,6 @@ function sourceForSchoolEvent(event: OfficialSchoolCalendarEvent): ProjectionEvi
   };
 }
 
-function chunksFor(
-  work: ClassroomCoursework,
-  minutes: number,
-  maxDirectionsAtOnce: 2 | 3
-): ProjectedPriority["chunks"] {
-  if (maxDirectionsAtOnce === 2) {
-    return [
-      {
-        id: `${work.externalId}:setup`,
-        order: 1,
-        label: "Set up and start",
-        action: "Open the directions, gather what you need, and begin one visible section.",
-        minutes: Math.max(5, minutes - 5),
-        skill: "organization",
-        visualState: "ready"
-      },
-      {
-        id: `${work.externalId}:check`,
-        order: 2,
-        label: "Stop and check",
-        action: "When the timebox ends, check your progress and choose the next step.",
-        minutes: 5,
-        skill: "time_management",
-        visualState: "check"
-      }
-    ];
-  }
-  return [
-    {
-      id: `${work.externalId}:setup`,
-      order: 1,
-      label: "Set up",
-      action: "Open the directions and gather what you need.",
-      minutes: 3,
-      skill: "organization",
-      visualState: "ready"
-    },
-    {
-      id: `${work.externalId}:focus`,
-      order: 2,
-      label: "Focus",
-      action: "Work on one visible section until the timebox ends.",
-      minutes: Math.max(5, minutes - 8),
-      skill: "time_management",
-      visualState: "next"
-    },
-    {
-      id: `${work.externalId}:check`,
-      order: 3,
-      label: "Check and choose",
-      action: "Check the directions, then decide whether to submit or schedule the next chunk.",
-      minutes: 5,
-      skill: "prioritization",
-      visualState: "check"
-    }
-  ];
-}
-
 function priorityBand(level: UrgencyLevel): ProjectedPriority["priorityBand"] {
   if (level === "overdue" || level === "today" || level === "tomorrow") return "do_first";
   if (level === "soon" || level === "upcoming") return "plan_next";
@@ -433,6 +387,8 @@ function priorityBand(level: UrgencyLevel): ProjectedPriority["priorityBand"] {
 }
 
 function statusSignal(work: ClassroomCoursework): string {
+  if (work.submissionState === "TURNED_IN") return "Turned in";
+  if (work.submissionState === "RETURNED") return "Returned";
   if (work.submissionState === "RECLAIMED_BY_STUDENT") return "Needs another submission";
   if (!work.submissionState || work.submissionState === "NEW" || work.submissionState === "CREATED") {
     return "Not submitted";
@@ -452,6 +408,17 @@ function projectedPriority(input: {
   const urgencyValue = urgency(days, input.work.late);
   const effort = estimateEffort(input.work, input.recommendedTimeboxLimit);
   const status = statusSignal(input.work);
+  const taskKind = classifyTaskSessionKind(input.work);
+  const maxSteps = input.maxDirectionsAtOnce === 2 ? 2 : 4;
+  const sessionPlan = buildTaskSessionPlan({
+    externalId: input.work.externalId,
+    title: input.work.title,
+    directions: input.work.description,
+    workType: input.work.workType,
+    taskKind,
+    selectedMinutes: effort.recommendedTimeboxMinutes,
+    maxSteps
+  });
   const signals = [urgencyValue.label, `About ${effort.estimatedMinutes} minutes`, status];
   return {
     id: `google_classroom:coursework:${input.work.externalId}`,
@@ -475,7 +442,8 @@ function projectedPriority(input: {
       summary: `${urgencyValue.label} · ${effort.estimatedMinutes} minutes · ${status.toLowerCase()}.`,
       signals
     },
-    chunks: chunksFor(input.work, effort.recommendedTimeboxMinutes, input.maxDirectionsAtOnce),
+    sessionPlan: { kind: sessionPlan.kind, maxSteps },
+    chunks: sessionPlan.steps,
     source: sourceForCoursework(input.work)
   };
 }
@@ -616,6 +584,17 @@ export function projectStudentSources(input: {
       externalLinkPolicy: externalLinkPolicy.data
     })] : [];
   }).sort(prioritySort).map((priority, index) => ({ ...priority, rank: index + 1 }));
+  const courseworkStatuses: ProjectedCourseworkStatus[] = input.snapshot.coursework.map((work) => ({
+    taskId: `google_classroom:coursework:${work.externalId}`,
+    externalId: work.externalId,
+    title: work.title,
+    courseExternalId: work.courseExternalId,
+    courseName: courses.get(work.courseExternalId)?.name ?? null,
+    state: work.submissionState,
+    label: statusSignal(work),
+    isSourceComplete: COMPLETED_STATES.has(work.submissionState ?? ""),
+    sourceUpdatedAt: work.updateTime
+  }));
   const schoolEvents = relevantSchoolEvents(input.schoolSnapshot, parsedProfile.data.grade);
 
   const todayTimeline: TimelineBlock[] = [];
@@ -867,6 +846,7 @@ export function projectStudentSources(input: {
     today: { date: currentDate, timeline: todayTimeline },
     week: { startDate: currentDate, endDate: weekEnd, days: weekDays },
     priorities,
+    courseworkStatuses,
     learningRecommendations,
     guardianAssistCandidates: priorities.flatMap((priority) => {
       const candidate = guardianAssistCandidate(priority);

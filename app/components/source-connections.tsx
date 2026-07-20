@@ -125,11 +125,11 @@ export function SourceConnections({
     <section className="source-connections card" id="sources" aria-labelledby="sources-title">
       <header className="sources-header">
         <div>
-          <p className="eyebrow">GUARDIAN-MANAGED · READ ONLY</p>
-          <h2 id="sources-title">Guardian-managed school sources</h2>
-          <p>Matt controls connections. Emily can use the imported classes, assignments, and events without changing source access.</p>
+          <p className="eyebrow">SCHOOL CONNECTIONS</p>
+          <h2 id="sources-title">Connected school information</h2>
+          <p>Your guardian controls which classes, assignments, and events appear in Homeroom.</p>
         </div>
-        <span className="source-readonly-badge">No write permissions</span>
+        <span className="source-readonly-badge">Read only</span>
       </header>
 
       <div className="source-provider-grid">
@@ -156,19 +156,19 @@ export function SourceConnections({
         <div className="source-snapshot" aria-live="polite">
           <section>
             <div className="source-snapshot-title"><h3>Active classes</h3><span>{snapshot.courses.length}</span></div>
-            {snapshot.courses.slice(0, 8).map((course) => <article key={course.externalId}><strong>{course.name}</strong><small>{course.trackCourseId ? "Learning track ready" : "Visible · track mapping needed"}</small></article>)}
+            {snapshot.courses.slice(0, 8).map((course) => <article key={course.externalId}><strong>{course.name}</strong><small>{course.trackCourseId ? "Practice room available" : "Class is available"}</small></article>)}
           </section>
           <section>
             <div className="source-snapshot-title"><h3>Upcoming coursework</h3><span>{snapshot.coursework.length}</span></div>
             {snapshot.coursework.slice(0, 5).map((work) => <article key={work.externalId}><strong>{work.title}</strong><small>{shortDate(work.dueDate)}{work.submissionState ? ` · ${work.submissionState.toLowerCase().replaceAll("_", " ")}` : ""}</small></article>)}
           </section>
           <section>
-            <div className="source-snapshot-title"><h3>BAND events</h3><span>{snapshot.events.length}</span></div>
+            <div className="source-snapshot-title"><h3>Band events</h3><span>{snapshot.events.length}</span></div>
             {snapshot.events.slice(0, 5).map((event) => <article key={event.uid}><strong>{event.title}</strong><small>{eventDate(event.startsAt, event.allDay)}{event.location ? ` · ${event.location}` : ""}</small></article>)}
           </section>
         </div>
       )}
-      <p className="source-boundary">Homeroom never posts, edits, submits, grades, or RSVPs. <Link href="/guardian#school-sources">Open guardian workspace</Link></p>
+      <p className="source-boundary">These connections are read only. <Link href="/guardian#school-sources">Open guardian workspace</Link></p>
     </section>
   );
 }

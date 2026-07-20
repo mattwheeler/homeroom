@@ -11,8 +11,10 @@ describe("AccountEntry", () => {
     expect(html).toContain("Who is using Homeroom?");
     expect(html).toContain("Sign in as Emily");
     expect(html).toContain("Sign in as Matt");
-    expect(html).toContain("Verified household access");
-    expect(html).toContain("Google verifies identity first");
+    expect(html).toContain("Choose a profile");
+    expect(html).toContain("Google sign-in keeps student and guardian spaces separate");
+    expect(html).toContain("OpenAI Build Week judge access");
+    expect(html).toContain('aria-controls="build-week-judge-panel"');
     expect(html).not.toContain('href="/student"');
     expect(html).not.toContain('href="/guardian"');
   });

@@ -1,7 +1,7 @@
 import type { SessionRole } from "./session-token";
 
 export interface VerifiedIdentity {
-  provider: "google";
+  provider: "google" | "judge";
   subject: string;
   email: string;
   role: SessionRole;
@@ -46,7 +46,7 @@ function payload(value: unknown): IdentityTokenPayload {
   const candidate = value as Partial<IdentityTokenPayload>;
   if (
     candidate.purpose !== "homeroom_identity" ||
-    candidate.provider !== "google" ||
+    (candidate.provider !== "google" && candidate.provider !== "judge") ||
     typeof candidate.subject !== "string" || !candidate.subject || candidate.subject.length > 255 ||
     typeof candidate.email !== "string" || !candidate.email || candidate.email.length > 320 ||
     (candidate.role !== "student" && candidate.role !== "guardian") ||

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import "./calm-momentum.css";
 
 export const metadata: Metadata = {
   title: "Homeroom — AI that helps students stay ahead",

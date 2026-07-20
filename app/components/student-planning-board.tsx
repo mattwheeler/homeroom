@@ -11,12 +11,14 @@ function TodayView({
   projection,
   onOpenTask,
   onOpenPlanner,
-  completedPriorityIds = []
+  completedPriorityIds = [],
+  presentation = "page"
 }: {
   projection: StudentSourceProjection;
   onOpenTask?: (priority: StudentSourceProjection["priorities"][number]) => void;
   onOpenPlanner?: () => void;
   completedPriorityIds?: readonly string[];
+  presentation?: "page" | "workspace";
 }) {
   const choices = projection.priorities.filter((item) => !completedPriorityIds.includes(item.id));
   const [choiceIndex, setChoiceIndex] = useState(0);
@@ -24,16 +26,16 @@ function TodayView({
 
   if (!priority) {
     return (
-      <section className={`${styles.board} ${styles.todayBoard}`} aria-labelledby="today-focus-title">
+      <section className={`${styles.board} ${styles.todayBoard} ${presentation === "workspace" ? styles.workspaceBoard : ""}`} aria-labelledby="today-focus-title">
         <header className={styles.calmHeader}>
-          <p>TODAY · ONE THING AT A TIME</p>
+          <p>TODAY</p>
           <h2 id="today-focus-title">You’re caught up.</h2>
           <span>No unfinished Classroom work needs your attention right now.</span>
         </header>
         <div className={styles.doneState}>
           <span aria-hidden="true">✓</span>
           <strong>Nothing to decide.</strong>
-          <p>You can check My week or choose a short Learning room when you feel ready.</p>
+          <p>Check your Calendar or choose a short practice when you feel ready.</p>
           {onOpenPlanner && <button type="button" onClick={onOpenPlanner}>Plan today</button>}
         </div>
       </section>
@@ -44,13 +46,15 @@ function TodayView({
   const firstChunk = priority.chunks[0];
 
   return (
-    <section className={`${styles.board} ${styles.todayBoard}`} aria-labelledby="today-focus-title">
-      <header className={styles.calmHeader}>
-        <p>TODAY · ONE THING AT A TIME</p>
-        <h2 id="today-focus-title">One thing at a time.</h2>
-        <span>Homeroom already sorted the list. You only need to choose this one step.</span>
-        {choiceIndex > 0 && <span>You chose an alternative. The original recommendation is still available.</span>}
-      </header>
+    <section className={`${styles.board} ${styles.todayBoard} ${presentation === "workspace" ? styles.workspaceBoard : ""}`} aria-labelledby={presentation === "workspace" ? "today-priority-title" : "today-focus-title"}>
+      {presentation === "page" && (
+        <header className={styles.calmHeader}>
+          <p>TODAY</p>
+          <h2 id="today-focus-title">One thing at a time.</h2>
+          <span>Here’s the next useful step.</span>
+          {choiceIndex > 0 && <span>You chose an alternative. The original recommendation is still available.</span>}
+        </header>
+      )}
 
       <article className={styles.primaryFocus}>
         <div className={styles.primaryTopline}>
@@ -60,7 +64,7 @@ function TodayView({
           </span>
         </div>
         <p className={styles.startLabel}>Start here</p>
-        <h3>{priority.title}</h3>
+        <h3 id={presentation === "workspace" ? "today-priority-title" : undefined}>{priority.title}</h3>
         <span className={styles.courseLabel}>{priority.course.name}</span>
         <p className={styles.priorityReason}>{priority.rationale.signals.join(" · ")}.</p>
         {priority.directions && <p className={styles.taskSummary}><strong>What it is:</strong> {priority.directions}</p>}
@@ -80,12 +84,16 @@ function TodayView({
           {choices.length > 1 && (
             <button type="button" onClick={() => setChoiceIndex((current) => (current + 1) % choices.length)}>Show me another option</button>
           )}
+          {presentation === "workspace" && onOpenPlanner && (
+            <button className={styles.planButton} type="button" aria-label="Build today’s live plan" onClick={onOpenPlanner}>Plan my day</button>
+          )}
         </div>
+        {presentation === "workspace" && choiceIndex > 0 && <p className={styles.workspaceChoiceNotice}>You chose another option. The first recommendation is still available.</p>}
       </article>
 
-      {nextChunks.length > 0 && (
+      {presentation === "page" && nextChunks.length > 0 && (
         <section className={styles.nextPreview} aria-labelledby="next-preview-title">
-          <div><p>NEXT</p><h3 id="next-preview-title">Only after the first step</h3></div>
+          <div><p>NEXT</p><h3 id="next-preview-title">Then, if you want</h3></div>
           <ol>
             {nextChunks.map((chunk) => (
               <li key={chunk.id} data-next-item={chunk.order}>
@@ -98,19 +106,18 @@ function TodayView({
         </section>
       )}
 
-      {onOpenPlanner && (
+      {presentation === "page" && onOpenPlanner && (
         <section className={styles.routineCard} aria-labelledby="day-routine-title">
           <span aria-hidden="true">☀</span>
           <div>
-            <small>LIVE SOURCES · DAY PLAN</small>
+            <small>PLAN YOUR DAY</small>
             <h3 id="day-routine-title">Want help fitting today together?</h3>
-            <p>This is separate from the assignment above. Homeroom can propose four calm steps from your current classes, calendar, and priorities.</p>
+            <p>Put your assignments and events into four simple steps.</p>
           </div>
           <button type="button" aria-label="Build today’s live plan" onClick={onOpenPlanner}>Plan today</button>
         </section>
       )}
 
-      <p className={styles.reassurance}><span aria-hidden="true">✓</span> You do not need to hold the whole day in your head.</p>
     </section>
   );
 }
@@ -119,7 +126,7 @@ function WeekView({ projection }: { projection: StudentSourceProjection }) {
   return (
     <section className={`${styles.board} ${styles.weekBoard}`} aria-labelledby="week-title">
       <header className={styles.calmHeader}>
-        <p>MY WEEK · SEVEN-DAY VIEW</p>
+        <p>WEEK</p>
         <h2 id="week-title">Your week at a glance.</h2>
         <span>Look ahead here—then return to Today for just one next step.</span>
       </header>
@@ -156,17 +163,19 @@ export function StudentPlanningBoardView({
   view = "today",
   onOpenTask,
   onOpenPlanner,
-  completedPriorityIds
+  completedPriorityIds,
+  presentation = "page"
 }: {
   projection: StudentSourceProjection;
   view?: StudentPlanningView;
   onOpenTask?: (priority: StudentSourceProjection["priorities"][number]) => void;
   onOpenPlanner?: () => void;
   completedPriorityIds?: readonly string[];
+  presentation?: "page" | "workspace";
 }) {
   return view === "week"
     ? <WeekView projection={projection} />
-    : <TodayView projection={projection} onOpenTask={onOpenTask} onOpenPlanner={onOpenPlanner} completedPriorityIds={completedPriorityIds} />;
+    : <TodayView projection={projection} onOpenTask={onOpenTask} onOpenPlanner={onOpenPlanner} completedPriorityIds={completedPriorityIds} presentation={presentation} />;
 }
 
 export function StudentPlanningBoard({

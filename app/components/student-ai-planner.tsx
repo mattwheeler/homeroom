@@ -137,20 +137,20 @@ export function StudentAIPlanner({ csrfToken, studentName = "Emily" }: StudentAI
     <section className={styles.planner} aria-labelledby="ai-planner-title">
       <div className={styles.intro}>
         <div>
-          <p className={styles.eyebrow}>LIVE DAY PLANNER · STUDENT CONTROLLED</p>
+          <p className={styles.eyebrow}>PLAN YOUR DAY</p>
           <h2 id="ai-planner-title">Plan one school day.</h2>
-          <p>Homeroom reads your connected classes, assignments, school dates, and activities, then proposes four manageable steps. You choose whether to save them.</p>
+          <p>Turn your connected assignments and events into four manageable steps.</p>
         </div>
-        <span className={styles.trustBadge}>♢ Read only · Private by design</span>
+        <span className={styles.trustBadge}>♢ Built from your connected school information</span>
       </div>
 
       <article className={styles.focusCard}>
         {!visiblePlan && !saved && (
           <>
             <span className={styles.focusIcon}>◷</span>
-            <p className={styles.eyebrow}>ONE USEFUL PLAN, NOT A REQUIRED PATH</p>
+            <p className={styles.eyebrow}>A SUGGESTION YOU CAN CHANGE</p>
             <h3>Turn today’s live sources into a small plan</h3>
-            <p>You can accept the suggestion, ask for another option, or leave and choose any task, class, or Learning Room yourself.</p>
+            <p>Use the suggestion, ask for another option, or choose something else.</p>
             <button type="button" onClick={buildPlan} disabled={busy !== null}>
               {busy === "plan" ? "Reading your connected sources…" : "Suggest a plan for today"}
             </button>
@@ -186,8 +186,8 @@ export function StudentAIPlanner({ csrfToken, studentName = "Emily" }: StudentAI
               </button>
             </div>
             <details className={styles.proofDetails}>
-              <summary>How Homeroom made this proposal</summary>
-              <p>It used the authenticated live projection only. School text is treated as untrusted data, the AI cannot write to a source, and nothing is saved without this exact approval.</p>
+              <summary>About this plan</summary>
+              <p>It uses your connected school information. Nothing changes in Classroom or your calendars, and nothing is saved until you choose it.</p>
             </details>
           </div>
         )}
@@ -195,9 +195,9 @@ export function StudentAIPlanner({ csrfToken, studentName = "Emily" }: StudentAI
         {saved && (
           <div className={styles.celebration}>
             <i>✓</i>
-            <p className={styles.eyebrow}>PLAN VERSION {saved.planVersion} SAVED</p>
+            <p className={styles.eyebrow}>PLAN SAVED</p>
             <h3>{studentName}, your plan is ready.</h3>
-            <p>You can follow it, refresh it from the latest sources, or ignore it and choose something else.</p>
+            <p>You can follow it, update it, or choose something else.</p>
             <button type="button" onClick={refreshPlan} disabled={busy !== null}>
               {busy === "refresh" ? "Checking your sources…" : "Refresh from latest sources"}
             </button>

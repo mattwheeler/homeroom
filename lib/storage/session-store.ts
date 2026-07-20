@@ -10,7 +10,7 @@ export interface SessionRecord {
   studentId?: string;
   guardianId?: string;
   role: SessionRole;
-  identityProvider?: "google";
+  identityProvider?: "google" | "judge";
   identitySubject?: string;
   identityEmail?: string;
   state: SessionState;
@@ -57,7 +57,7 @@ interface SessionRow {
   student_id: string | null;
   guardian_id: string | null;
   role: SessionRole;
-  identity_provider: "google" | null;
+  identity_provider: "google" | "judge" | null;
   identity_subject: string | null;
   identity_email: string | null;
   state_json: string;

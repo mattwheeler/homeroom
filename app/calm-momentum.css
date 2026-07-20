@@ -1,0 +1,536 @@
+/*
+ * Calm Momentum
+ * -------------
+ * Homeroom's shared presentation contract. This file intentionally contains
+ * presentation-only overrides while the existing route components and their
+ * behavior remain unchanged.
+ */
+
+:root {
+  --cm-font-ui: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --cm-ink: #18332a;
+  --cm-ink-strong: #17283f;
+  --cm-text: #435f54;
+  --cm-muted: #6b7e75;
+  --cm-subtle: #85938c;
+  --cm-canvas: #f7faf7;
+  --cm-surface: #ffffff;
+  --cm-surface-soft: #f3f7f4;
+  --cm-surface-sage: #eaf4ee;
+  --cm-line: #d8e5dd;
+  --cm-line-strong: #bfd3c7;
+  --cm-primary: #245f4b;
+  --cm-primary-hover: #1c503e;
+  --cm-primary-soft: #e7f2ec;
+  --cm-coral: #d96751;
+  --cm-gold: #d49a42;
+  --cm-blue: #4f7eb5;
+  --cm-success: #39745c;
+  --cm-danger: #a8453d;
+  --cm-focus: #f09a7f;
+
+  --cm-type-display: clamp(2.5rem, 5vw, 3.25rem);
+  --cm-type-h1: clamp(2rem, 4vw, 2.5rem);
+  --cm-type-h2: clamp(1.55rem, 2.6vw, 1.75rem);
+  --cm-type-h3: 1.2rem;
+  --cm-type-body-lg: 1rem;
+  --cm-type-body: 0.9rem;
+  --cm-type-small: 0.78rem;
+  --cm-type-micro: 0.7rem;
+
+  --cm-leading-tight: 1.12;
+  --cm-leading-heading: 1.22;
+  --cm-leading-body: 1.55;
+
+  --cm-space-1: 0.5rem;
+  --cm-space-2: 1rem;
+  --cm-space-3: 1.5rem;
+  --cm-space-4: 2rem;
+  --cm-space-5: 2.5rem;
+  --cm-space-6: 3rem;
+
+  --cm-radius-control: 0.75rem;
+  --cm-radius-card: 1rem;
+  --cm-radius-feature: 1.35rem;
+  --cm-shadow-card: 0 12px 34px rgb(31 66 55 / 7%);
+  --cm-shadow-feature: 0 18px 52px rgb(31 66 55 / 9%);
+}
+
+html {
+  font-size: 18px;
+}
+
+body {
+  color: var(--cm-ink-strong);
+  background: var(--cm-canvas);
+  font-family: var(--cm-font-ui);
+  font-size: var(--cm-type-body);
+  line-height: var(--cm-leading-body);
+}
+
+body :is(h1, h2, h3, h4, h5, h6),
+body :is([class*="_period_"], [class*="_rank_"], [class*="_countdown_"] strong),
+body :is(.date-tile strong, .score-ring, .learning-priority-rank, .learning-timebox-ring-wrap > span) {
+  font-family: var(--cm-font-ui) !important;
+}
+
+body :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--cm-ink);
+  letter-spacing: -0.025em !important;
+  text-wrap: balance;
+}
+
+body :is(p, li, label, input, textarea, select, button) {
+  font-family: var(--cm-font-ui);
+}
+
+body :is(p, li) {
+  line-height: var(--cm-leading-body);
+}
+
+body :is(button, a, input, textarea, select, summary):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--cm-focus) 62%, transparent);
+  outline-offset: 3px;
+}
+
+/* Shared page shell and page-header rhythm. */
+body :is(
+  [class*="_calendar_"],
+  [class*="_classes_"],
+  [class*="_board_"],
+  [class*="_planner_"],
+  [class*="_checkIn_"]
+) {
+  color: var(--cm-ink);
+}
+
+body :is(
+  [class*="_calendar_"] > [class*="_intro_"],
+  [class*="_classes_"] > [class*="_intro_"],
+  [class*="_shell_"]:has([class*="_lists_"]) > [class*="_intro_"],
+  [class*="_calmHeader_"],
+  [class*="_heading_"]
+) {
+  margin-bottom: var(--cm-space-4);
+}
+
+body :is(
+  [class*="_calendar_"] [class*="_intro_"] h2,
+  [class*="_classes_"] [class*="_intro_"] h2,
+  [class*="_shell_"]:has([class*="_lists_"]) [class*="_intro_"] h2,
+  [class*="_checkIn_"] [class*="_heading_"] h1,
+  [class*="_calmHeader_"] h1,
+  .learning-header h2,
+  .sources-header h2
+) {
+  margin: 0;
+  color: var(--cm-ink);
+  font-family: var(--cm-font-ui) !important;
+  font-size: var(--cm-type-h1) !important;
+  font-weight: 760 !important;
+  line-height: var(--cm-leading-tight) !important;
+  letter-spacing: -0.045em !important;
+}
+
+body :is(
+  [class*="_intro_"] > div > span,
+  [class*="_heading_"] > div:first-child > span,
+  [class*="_calmHeader_"] > p,
+  .learning-header > div > p,
+  .sources-header > div > p
+) {
+  max-width: 66ch;
+  margin-top: 0.65rem;
+  color: var(--cm-muted);
+  font-size: var(--cm-type-body-lg) !important;
+  line-height: var(--cm-leading-body);
+}
+
+body :is(
+  [class*="_intro_"] > p,
+  [class*="_heading_"] > div:first-child > p,
+  [class*="_calmHeader_"] > div > p,
+  [class*="_eyebrow_"],
+  .eyebrow,
+  .card-label,
+  .section-label
+) {
+  color: var(--cm-coral) !important;
+  font-size: var(--cm-type-micro) !important;
+  font-weight: 850 !important;
+  line-height: 1.35;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase;
+}
+
+/* One functional type hierarchy everywhere. */
+body :is(
+  [class*="_welcome_"] h1,
+  [class*="_entryCard_"] h1,
+  [class*="_card_"] > h1,
+  [class*="_hero_"] > div > h1
+) {
+  font-family: var(--cm-font-ui) !important;
+  font-size: var(--cm-type-display) !important;
+  font-weight: 780 !important;
+  line-height: 1 !important;
+  letter-spacing: -0.055em !important;
+}
+
+body :is(
+  [class*="_hero_"] h1,
+  [class*="_primaryFocus_"] h3,
+  [class*="_todayLifecycle_"] h1,
+  [class*="_intro_"] h2
+) {
+  font-family: var(--cm-font-ui) !important;
+  font-weight: 760 !important;
+}
+
+body :is(
+  [class*="_aiCheckIn_"] > header h2,
+  [class*="_choice_"] h2,
+  [class*="_card_"] h3,
+  [class*="_panelHeading_"] h3,
+  [class*="_sectionHead_"] h2,
+  [class*="_visualCopy_"] h3,
+  [class*="_twoColumns_"] h3,
+  [class*="_bandSourceMapHeading_"] h3,
+  [class*="_head_"] h2,
+  .learning-stage-heading h3,
+  .learning-visual-scaffold figcaption h4,
+  .learning-setup-heading h4,
+  .guardian-preview-heading h3,
+  .practice-heading h3,
+  .practice-celebration h3
+) {
+  font-family: var(--cm-font-ui) !important;
+  font-size: var(--cm-type-h2) !important;
+  font-weight: 740 !important;
+  line-height: var(--cm-leading-heading) !important;
+  letter-spacing: -0.025em !important;
+}
+
+body :is(
+  [class*="_classIdentity_"] strong,
+  [class*="_choice_"] h2,
+  [class*="_routineCard_"] h3,
+  [class*="_nextPreview_"] h3,
+  [class*="_profiles_"] h2,
+  [class*="_sourceTitle_"] strong,
+  .learning-track-button > strong,
+  .learning-priority-card h4,
+  .learning-choice-row button strong,
+  .guardian-card h2,
+  .family-reminder-preview h3
+) {
+  font-family: var(--cm-font-ui) !important;
+  font-size: var(--cm-type-h3) !important;
+  font-weight: 720 !important;
+  line-height: var(--cm-leading-heading) !important;
+}
+
+/* Shared surfaces, borders, radii and elevation. */
+body :is(
+  [class*="_checkIn_"],
+  [class*="_classCard_"],
+  [class*="_monthCard_"],
+  [class*="_agenda_"],
+  [class*="_lists_"] > [class*="_card_"],
+  [class*="_learning-workspace_"],
+  .learning-workspace,
+  [class*="_inbox_"] > [class*="_card_"],
+  [class*="_sectionHead_"] + [class*="_card_"]
+) {
+  border-color: var(--cm-line) !important;
+  border-radius: var(--cm-radius-feature) !important;
+  background-color: var(--cm-surface);
+  box-shadow: var(--cm-shadow-feature) !important;
+}
+
+body :is(
+  [class*="_aiCheckIn_"],
+  [class*="_choice_"],
+  [class*="_classSummary_"],
+  [class*="_assignmentList_"] li,
+  [class*="_focusStarters_"] button,
+  [class*="_sourceCard_"],
+  [class*="_skillCard_"],
+  [class*="_routineCard_"],
+  [class*="_firstStep_"],
+  .learning-track-button,
+  .learning-choice-row button
+) {
+  border-color: var(--cm-line) !important;
+  border-radius: var(--cm-radius-card) !important;
+}
+
+body :is(
+  [class*="_primaryButton_"],
+  [class*="_focusButton_"],
+  [class*="_openTask_"],
+  [class*="_timerButton_"],
+  [class*="_finishButton_"],
+  [class*="_learningButton_"],
+  [class*="_choice_"] > button,
+  [class*="_aiCheckIn_"] form > div > button,
+  [class*="_homeroomTurn_"] > button,
+  .primary-button,
+  .approve-button,
+  .learning-start-button,
+  .guardian-send-button
+) {
+  min-height: 44px;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--cm-radius-control) !important;
+  color: #fff !important;
+  background: var(--cm-primary) !important;
+  font-size: var(--cm-type-small) !important;
+  font-weight: 800 !important;
+  line-height: 1.2;
+  box-shadow: none !important;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+body :is(
+  [class*="_primaryButton_"],
+  [class*="_focusButton_"],
+  [class*="_openTask_"],
+  [class*="_timerButton_"],
+  [class*="_finishButton_"],
+  [class*="_learningButton_"],
+  [class*="_choice_"] > button,
+  .primary-button,
+  .approve-button
+):hover:not(:disabled) {
+  background: var(--cm-primary-hover) !important;
+  transform: translateY(-1px);
+}
+
+body :is(
+  [class*="_sortControl_"] button,
+  [class*="_planButton_"],
+  [class*="_closeButton_"],
+  [class*="_sourceAction_"],
+  [class*="_routineCard_"] button,
+  [class*="_profiles_"] button,
+  .source-check-button,
+  .learning-room-back
+) {
+  min-height: 44px;
+  border-radius: var(--cm-radius-control) !important;
+  font-size: var(--cm-type-small) !important;
+  font-weight: 780 !important;
+}
+
+/* Readable support text: metadata may be quiet, never microscopic. */
+body :is(
+  [class*="_classIdentity_"] small,
+  [class*="_classStatus_"] small,
+  [class*="_classStatus_"] em,
+  [class*="_assignmentList_"] small,
+  [class*="_card_"] li small,
+  [class*="_card_"] footer small,
+  [class*="_sourceSignal_"] small,
+  [class*="_focusStarters_"] small,
+  [class*="_studentTurn_"] p,
+  [class*="_homeroomTurn_"] p,
+  [class*="_choice_"] div > span,
+  [class*="_railNav_"] small,
+  [class*="_sourceTitle_"] small,
+  [class*="_sourceTypeGrid_"] p,
+  [class*="_sourceTypeGrid_"] small,
+  [class*="_bandResourceGrid_"] p,
+  [class*="_bandResourceGrid_"] small,
+  [class*="_progressCard_"] > small,
+  [class*="_evidence_"] span,
+  .learning-track-button > span,
+  .learning-header > div > p
+) {
+  color: var(--cm-muted) !important;
+  font-size: var(--cm-type-small) !important;
+  line-height: 1.45 !important;
+}
+
+body :is(
+  [class*="_focusStarters_"] strong,
+  [class*="_studentTurn_"] strong,
+  [class*="_homeroomTurn_"] strong,
+  [class*="_sourceSignal_"] strong,
+  [class*="_panelFooter_"],
+  [class*="_organizationCue_"],
+  [class*="_skillReminder_"] strong,
+  [class*="_skillReminder_"] small
+) {
+  font-size: var(--cm-type-small) !important;
+}
+
+/* Student home and navigation. */
+body [class*="_topbar_"] {
+  border-color: var(--cm-line) !important;
+  background: rgb(255 255 255 / 94%) !important;
+}
+
+body [class*="_tabs_"] {
+  border-radius: var(--cm-radius-card) !important;
+  background: #edf2ef !important;
+}
+
+body [class*="_tabs_"] button {
+  min-height: 44px;
+  border-radius: var(--cm-radius-control) !important;
+  font-size: var(--cm-type-small) !important;
+}
+
+body [class*="_welcome_"] h2 {
+  color: var(--cm-text) !important;
+  font-size: var(--cm-type-h1) !important;
+  font-weight: 680 !important;
+  line-height: var(--cm-leading-heading) !important;
+}
+
+body [class*="_welcome_"] > p:not([class*="_eyebrow_"]):not([class*="_error_"]) {
+  color: var(--cm-muted) !important;
+  font-size: var(--cm-type-body-lg) !important;
+  line-height: var(--cm-leading-body) !important;
+}
+
+/* Calendar, classes, supplies and learn share one utility-page scale. */
+body :is([class*="_calendar_"], [class*="_classes_"], [class*="_shell_"]:has([class*="_lists_"])) {
+  width: min(1200px, 100%);
+  margin-inline: auto;
+  padding: clamp(1.25rem, 4vw, 2.5rem) !important;
+}
+
+body [class*="_monthHeader_"] h3,
+body [class*="_agenda_"] header h3 {
+  font-family: var(--cm-font-ui) !important;
+  font-size: var(--cm-type-h2) !important;
+  font-weight: 740 !important;
+}
+
+body [class*="_weekdays_"] {
+  font-size: var(--cm-type-micro) !important;
+  letter-spacing: 0.08em !important;
+}
+
+body [class*="_classSummary_"] {
+  min-height: 76px;
+}
+
+body [class*="_period_"] {
+  font-size: var(--cm-type-body-lg) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+body .learning-workspace {
+  width: min(1080px, 100%);
+  margin-inline: auto;
+  padding: clamp(1.25rem, 3vw, 2rem) !important;
+}
+
+body .learning-track-grid {
+  gap: var(--cm-space-2) !important;
+}
+
+/* Task and learning rooms remain focused but use the same system. */
+body [class*="_room_"] {
+  --task-green: var(--cm-primary);
+  --task-green-2: var(--cm-success);
+  --task-coral: var(--cm-coral);
+  --task-ink: var(--cm-ink-strong);
+  --task-muted: var(--cm-muted);
+  background: var(--cm-canvas) !important;
+}
+
+body [class*="_room_"] [class*="_content_"] {
+  width: min(1240px, 100%) !important;
+}
+
+body [class*="_room_"] [class*="_hero_"] h1 {
+  font-family: var(--cm-font-ui) !important;
+  font-size: var(--cm-type-h1) !important;
+  font-weight: 760 !important;
+  line-height: var(--cm-leading-tight) !important;
+}
+
+body :is(
+  [class*="_progressCard_"],
+  [class*="_timerCard_"],
+  [class*="_sourceCard_"],
+  [class*="_directions_"],
+  [class*="_nowCard_"],
+  [class*="_chunkSection_"],
+  [class*="_actions_"]
+) {
+  border-color: var(--cm-line) !important;
+  border-radius: var(--cm-radius-card) !important;
+  box-shadow: var(--cm-shadow-card) !important;
+}
+
+/* Guardian uses the same language at a denser information scale. */
+body [class*="_hero_"] h1 {
+  font-family: var(--cm-font-ui) !important;
+}
+
+body [class*="_hero_"] h1 span {
+  color: var(--cm-muted) !important;
+}
+
+body [class*="_sectionHead_"] h2 {
+  font-size: var(--cm-type-h2) !important;
+}
+
+body [class*="_railNav_"] > a,
+body [class*="_sourceCard_"],
+body [class*="_skillCard_"],
+body [class*="_visualPanel_"],
+body [class*="_saveBar_"] {
+  border-radius: var(--cm-radius-card) !important;
+}
+
+body [class*="_card_"]:has([class*="_profiles_"]) {
+  border-radius: var(--cm-radius-feature) !important;
+}
+
+/* Prevent native-looking controls from escaping the system. */
+body button:not(:disabled) {
+  cursor: pointer;
+}
+
+body button:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --cm-type-display: 2.4rem;
+    --cm-type-h1: 2rem;
+    --cm-type-h2: 1.5rem;
+  }
+
+  body :is(
+    [class*="_calendar_"] > [class*="_intro_"],
+    [class*="_classes_"] > [class*="_intro_"],
+    [class*="_shell_"]:has([class*="_lists_"]) > [class*="_intro_"],
+    [class*="_heading_"]
+  ) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  body [class*="_checkIn_"] {
+    padding: 1.1rem !important;
+    border-radius: var(--cm-radius-card) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

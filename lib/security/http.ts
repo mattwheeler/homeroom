@@ -39,6 +39,25 @@ export function serializeSessionCookie(
   return parts.join("; ");
 }
 
+export function serializeIdentityCookie(
+  token: string,
+  options: { secure: boolean; maxAgeSeconds: number }
+): string {
+  const parts = [
+    `homeroom_identity=${encodeURIComponent(token)}`,
+    "HttpOnly",
+    "SameSite=Lax",
+    "Path=/",
+    `Max-Age=${Math.max(0, Math.floor(options.maxAgeSeconds))}`
+  ];
+  if (options.secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
+export function clearSessionCookie(secure: boolean): string {
+  return serializeSessionCookie("", { secure, maxAgeSeconds: 0 });
+}
+
 export function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get("cookie");
   if (!header) return null;
@@ -54,7 +73,7 @@ export function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
-function constantTimeEqual(left: string, right: string): boolean {
+export function constantTimeEqual(left: string, right: string): boolean {
   const length = Math.max(left.length, right.length);
   let difference = left.length ^ right.length;
   for (let index = 0; index < length; index += 1) {

@@ -8,7 +8,7 @@ The product thesis is simple: students should not have to translate a pile of sc
 
 - `/student` is Emily's complete student workspace. **Today** presents one actionable next task, **Calendar** combines schoolwork, band events, and official district dates, **Classes** shows all seven connected Classroom classes, **Supplies** shows only attributed school-list lines, and **Learn** opens independent AI-led Learning rooms. AI planning, source-change review, family help, guardian-safe sharing, and transparency evidence are progressively disclosed inside this journey. Guardian controls and source credentials never appear here.
 - `/guardian` is Matt's separate guardian workspace for Emily's age/grade profile, learning supports, safety and privacy controls, and read-only source connections—including Google Classroom, band calendars, the official district calendar, and official school/course supply pages.
-- `/` is a role-aware account entry screen. Student and guardian accounts authenticate separately with their allowlisted Google identities before opening their workspace. There is no separate demo product or demo-only route.
+- `/` is a role-aware account entry screen. Student and guardian accounts authenticate separately with their allowlisted Google identities before opening their workspace. A rate-limited, secret-protected Build Week reviewer entry grants a two-hour identity for the same fictional household and the same `/student` and `/guardian` product paths. There is no separate demo product or demo-only route.
 
 ## Live product experience
 
@@ -105,6 +105,7 @@ AUTH_STUDENT_EMAILS=student-google-account@example.com
 RESEND_API_KEY=your-resend-api-key
 GUARDIAN_DIGEST_FROM=Homeroom <updates@your-verified-domain.example>
 CRON_SECRET=another-random-secret-at-least-32-characters
+JUDGE_ACCESS_CODE=a-private-random-review-code-at-least-24-characters
 ```
 
 In Google Cloud, enable the Classroom API, configure the OAuth consent screen, add both linked accounts as test users while the app remains in testing, and register the exact redirect URI above on the same **Web application** OAuth client. Identity and Classroom authorization return through that single hardened callback, then are separated by mutually exclusive HttpOnly intent cookies. Classroom requests only `classroom.courses.readonly` and `classroom.coursework.me.readonly`; identity sign-in requests only `openid email profile`.
@@ -123,6 +124,7 @@ npm run typecheck
 npm run lint
 npm run build
 npm run security
+npm run verify:release
 ```
 
 ## Read-only school sources
@@ -165,14 +167,16 @@ The current UI refreshes both sources on explicit student action and synchronize
 
 Before exposing a persistent judge URL:
 
-1. apply every D1 migration, including `0009_product_loops.sql`, to the remote `homeroom-build-week` database;
+1. apply every D1 migration, including `0010_focus_session_context.sql`, to the remote `homeroom-build-week` database;
 2. configure the production Google identity and Classroom callback URLs and exact student/guardian email allowlists;
-3. set `SESSION_SIGNING_SECRET`, `SOURCE_TOKEN_ENCRYPTION_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `GUARDIAN_DIGEST_FROM`, and `CRON_SECRET` as Worker secrets;
+3. set `SESSION_SIGNING_SECRET`, `SOURCE_TOKEN_ENCRYPTION_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `GUARDIAN_DIGEST_FROM`, `CRON_SECRET`, and `JUDGE_ACCESS_CODE` as Worker secrets;
 4. verify the sending domain in Resend before enabling the weekly guardian digest;
 5. smoke-test student sign-in, guardian sign-in, source refresh, live-plan approval, Task Room completion, family-note delivery, inbox acknowledgement, and the scheduled digest against the deployed origin; and
 6. keep the D1-backed rate limiter and structured logging enabled on every public and model-spending endpoint.
 
 No remote migration, deployment, or outbound email is performed by the local setup commands.
+
+Release operations and judge testing are documented in [`docs/release-runbook.md`](docs/release-runbook.md) and [`docs/judge-guide.md`](docs/judge-guide.md). Security boundaries and reporting are documented in [`SECURITY.md`](SECURITY.md).
 
 Official provider references:
 

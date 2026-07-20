@@ -8,7 +8,11 @@ import { StructuredLogger } from "../../../../lib/observability/logger";
 import { readCookie } from "../../../../lib/security/http";
 import { verifyIdentityToken, type VerifiedIdentity } from "../../../../lib/security/identity-token";
 import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
-import { D1PrincipalStore } from "../../../../lib/storage/principal-store";
+import {
+  D1ExistingHouseholdPrincipalResolver,
+  D1PrincipalStore,
+  type HouseholdBootstrap
+} from "../../../../lib/storage/principal-store";
 import { D1SchoolSourceStore } from "../../../../lib/storage/school-source-store";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
 import { D1SourceConnectionStore } from "../../../../lib/storage/source-connection-store";
@@ -55,17 +59,20 @@ export async function POST(request: Request) {
   const schoolSources = new D1SchoolSourceStore(env.HOMEROOM_DB);
   const safetyPolicies = new D1StudentSafetyPolicyStore(env.HOMEROOM_DB);
   const url = new URL(request.url);
+  const household: HouseholdBootstrap = {
+    guardianEmail,
+    studentEmail,
+    guardianName: "Matt",
+    studentName: "Emily",
+    householdName: "Wheeler family"
+  };
   return handleStudentBootstrap(request, {
     store: sessions,
     signingSecret: env.SESSION_SIGNING_SECRET,
     identity,
-    principalResolver: new D1PrincipalStore(env.HOMEROOM_DB, {
-      guardianEmail,
-      studentEmail,
-      guardianName: "Matt",
-      studentName: "Emily",
-      householdName: "Wheeler family"
-    }),
+    principalResolver: identity?.provider === "judge"
+      ? new D1ExistingHouseholdPrincipalResolver(household)
+      : new D1PrincipalStore(env.HOMEROOM_DB, household),
     rateLimiter: new D1FixedWindowRateLimiter(env.HOMEROOM_DB, {
       limit: 12,
       windowMs: 60_000,

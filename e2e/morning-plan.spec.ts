@@ -550,7 +550,7 @@ test("Emily independently uses learning, family help, and a live day plan", asyn
 
   await page.goto("/student");
   await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening), Emily\./ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "One thing at a time." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Linear equations warm-up" })).toBeVisible();
 
   await page.getByRole("tab", { name: "Learn" }).click();
   await page.getByRole("button", { name: "Show all 7 classes" }).click();
@@ -571,7 +571,7 @@ test("Emily independently uses learning, family help, and a live day plan", asyn
   await page.getByRole("button", { name: "End and save session" }).click();
   await expect(page.getByRole("heading", { name: "What Homeroom remembers" })).toBeVisible();
   await expect(page.getByText("One worked example before independent practice.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Active dialogue deleted", { exact: true })).toBeVisible();
+  await expect(page.getByText("Conversation deleted", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByRole("heading", { name: "What Homeroom remembers" })).toBeHidden();
   await learningRoom.getByRole("button", { name: "Back to classes" }).click();
@@ -580,8 +580,8 @@ test("Emily independently uses learning, family help, and a live day plan", asyn
   await page.getByRole("tab", { name: "Today" }).click();
   await page.getByText("Something Matt may need to handle", { exact: true }).click();
   await page.getByRole("button", { name: "Ask Matt about this" }).click();
-  await expect(page.getByText("EXACT MESSAGE PREVIEW · NOT SENT YET", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Approve and notify Matt" }).click();
+  await expect(page.getByText("MESSAGE PREVIEW · NOT SENT", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Send to Matt" }).click();
   await expect(page.getByText("Delivered to Matt’s Homeroom inbox", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Build today’s live plan" }).click();
@@ -599,6 +599,6 @@ test("Emily independently uses learning, family help, and a live day plan", asyn
   await expect(planner.getByText("7:15 AM", { exact: true }).first()).toBeVisible();
   await expect(planner.getByText(revision.change.summary, { exact: true })).toBeVisible();
   await planner.getByRole("button", { name: "Use this plan" }).click();
-  await expect(planner.getByText("PLAN VERSION 2 SAVED", { exact: true })).toBeVisible();
-  await expect(planner.getByText(/ignore it and choose something else/)).toBeVisible();
+  await expect(planner.getByText("PLAN SAVED", { exact: true })).toBeVisible();
+  await expect(planner.getByText(/update it, or choose something else/)).toBeVisible();
 });

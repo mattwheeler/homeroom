@@ -13,7 +13,7 @@ describe("attention-aware Learning chooser", () => {
       csrfToken: "csrf"
     }));
 
-    expect(html).toContain("Recommended first");
+    expect(html).toContain(">LEARN<");
     expect((html.match(/learning-track-button/g) ?? [])).toHaveLength(3);
     expect(html).toContain("Show all 7 classes");
     expect(html).toContain("Concert and Marching Band");
@@ -32,7 +32,7 @@ describe("attention-aware Learning chooser", () => {
       grade: 9
     }));
 
-    expect(html).toContain("GRADE 9 SUMMER READINESS");
+    expect(html).toContain("GRADE 9 READINESS");
     expect(html).toContain("Your school classes aren’t synced yet");
     expect(html).toContain("Math foundations");
     expect(html).toContain("Homeroom-created for Grade 9");

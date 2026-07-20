@@ -206,9 +206,22 @@ describe("live student source projection", () => {
     ]);
     expect(result.priorities[0]?.chunks.map((chunk) => chunk.skill)).toEqual([
       "organization",
+      "prioritization",
       "time_management",
       "prioritization"
     ]);
+    expect(result.courseworkStatuses).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        taskId: "google_classroom:coursework:work_biology_complete",
+        label: "Turned in",
+        isSourceComplete: true
+      }),
+      expect.objectContaining({
+        taskId: "google_classroom:coursework:work_algebra_today",
+        label: "Not submitted",
+        isSourceComplete: false
+      })
+    ]));
     expect(result.priorities[0]?.chunks.reduce((sum, chunk) => sum + chunk.minutes, 0)).toBe(20);
 
     expect(result.today.timeline).toEqual(expect.arrayContaining([
@@ -231,7 +244,7 @@ describe("live student source projection", () => {
     expect(result.week.days.find((day) => day.date === "2026-08-18")?.items).toEqual([
       expect.objectContaining({ source: expect.objectContaining({ externalId: "work_english_tomorrow" }) })
     ]);
-    expect(JSON.stringify(result)).not.toContain("work_biology_complete");
+    expect(JSON.stringify(result.priorities)).not.toContain("work_biology_complete");
     expect(JSON.stringify(result)).not.toContain("https://classroom.google.com");
   });
 

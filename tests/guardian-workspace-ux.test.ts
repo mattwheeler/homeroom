@@ -19,9 +19,10 @@ import {
 } from "../lib/domain/guardian-setup-profile";
 
 describe("guardian workspace navigation", () => {
-  it("prioritizes the five working destinations and resolves deep links", () => {
+  it("prioritizes the six working destinations and resolves deep links", () => {
     expect(guardianNavigationItems.map((item) => [item.label, item.href])).toEqual([
       ["Inbox", "#guardian-inbox"],
+      ["Progress", "#student-progress"],
       ["Household & student", "#household"],
       ["Learning", "#learning-support"],
       ["Safety", "#safety-privacy"],
@@ -34,9 +35,9 @@ describe("guardian workspace navigation", () => {
 
   it("supports arrow, home, and end keyboard movement without trapping other keys", () => {
     expect(nextGuardianNavigationIndex(0, "ArrowDown")).toBe(1);
-    expect(nextGuardianNavigationIndex(0, "ArrowUp")).toBe(4);
+    expect(nextGuardianNavigationIndex(0, "ArrowUp")).toBe(5);
     expect(nextGuardianNavigationIndex(2, "Home")).toBe(0);
-    expect(nextGuardianNavigationIndex(2, "End")).toBe(4);
+    expect(nextGuardianNavigationIndex(2, "End")).toBe(5);
     expect(nextGuardianNavigationIndex(2, "Tab")).toBeNull();
   });
 });

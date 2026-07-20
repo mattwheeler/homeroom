@@ -37,6 +37,7 @@ const focus: FocusBlockRecord = {
   taskTitle: "Summer Reading", courseName: "English I", sourceProvider: "google_classroom",
   sourceExternalId: "coursework_01", estimatedMinutes: 20, selectedMinutes: 15,
   elapsedSeconds: 720, completedChunkIds: ["chunk_1"], completedChunkCount: 1,
+  plannedChunkCount: 3, taskKind: "writing", sourceStatus: "Not submitted",
   completedAt: "2026-07-19T16:00:00.000Z"
 };
 

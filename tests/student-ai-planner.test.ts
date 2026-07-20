@@ -24,9 +24,9 @@ describe("student AI planner capability", () => {
     }));
 
     expect(html).toContain("Plan one school day");
-    expect(html).toContain("connected classes, assignments, school dates, and activities");
+    expect(html).toContain("connected assignments and events");
     expect(html).toContain("Suggest a plan for today");
-    expect(html).toContain("NOT A REQUIRED PATH");
+    expect(html).toContain("A SUGGESTION YOU CAN CHANGE");
     expect(html).not.toContain("Build my band-camp routine");
     expect(html).not.toContain("Algebra practice");
     expect(html).not.toContain("SHARE WITH MATT");

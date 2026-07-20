@@ -6,6 +6,10 @@ import {
   studentSupportProfileSchema,
   type StudentSupportPolicy
 } from "./student-support-profile";
+import {
+  emptyGuardianProgress,
+  type GuardianProgressProjection
+} from "./guardian-progress";
 
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
@@ -92,6 +96,7 @@ export interface GuardianWorkspace {
   settings: GuardianSetupSettings;
   policy: StudentSupportPolicy;
   sources: GuardianSourceSummary[];
+  progress: GuardianProgressProjection;
 }
 
 export function defaultGuardianSetupSettings(): GuardianSetupSettings {
@@ -150,7 +155,8 @@ function sourceSummary(
 export function buildGuardianWorkspace(
   stored: StoredGuardianSetup,
   sourceStatuses: GuardianSourceStatus[],
-  identities: { guardianId?: string; studentId?: string; guardianName?: string } = {}
+  identities: { guardianId?: string; studentId?: string; guardianName?: string } = {},
+  progress?: GuardianProgressProjection
 ): GuardianWorkspace {
   const settings = guardianSetupSettingsSchema.parse(stored.settings);
   const statuses = sourceStatuses.map((status) => guardianSourceStatusSchema.parse(status));
@@ -187,6 +193,10 @@ export function buildGuardianWorkspace(
         "Official school or course supply list",
         statuses.find((source) => source.provider === "school_supplies")
       )
-    ]
+    ],
+    progress: progress ?? emptyGuardianProgress({
+      id: identities.studentId ?? "student_emily",
+      name: settings.profile.name
+    })
   };
 }

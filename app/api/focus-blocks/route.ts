@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { buildReentry, completeFocusBlock } from "../../../lib/domain/focus-block";
 import { projectStudentSources } from "../../../lib/domain/student-source-projection";
+import { buildTaskSessionPlan } from "../../../lib/domain/task-session-plan";
 import { emilyFixture } from "../../../lib/domain/fixtures";
 import { emilyStudentSupportProfile } from "../../../lib/domain/student-support-profile";
 import { authenticatedSession, AuthenticatedSessionError } from "../../../lib/http/authenticated-session";
@@ -68,6 +69,17 @@ export async function POST(request: Request) {
     }
     const task = projection.priorities.find((item) => item.id === body.priorityId);
     if (!task) return Response.json({ error: { code: "TASK_CHANGED", message: "This task changed in the school source. Refresh Today before saving." } }, { status: 409 });
+    const sessionPlan = buildTaskSessionPlan({
+      externalId: task.source.externalId,
+      title: task.title,
+      directions: task.directions,
+      taskKind: task.sessionPlan?.kind,
+      selectedMinutes: body.selectedMinutes,
+      maxSteps: task.sessionPlan?.maxSteps ?? task.chunks.length
+    });
+    const sourceStatus = projection.courseworkStatuses?.find((item) => item.taskId === task.id)?.label
+      ?? task.rationale.signals.at(-1)
+      ?? "School status not available";
     const record = await completeFocusBlock({
       store: focus,
       studentId,
@@ -79,7 +91,10 @@ export async function POST(request: Request) {
         sourceProvider: task.source.provider,
         sourceExternalId: task.source.externalId,
         estimatedMinutes: task.effort.estimatedMinutes,
-        validChunkIds: task.chunks.map((chunk) => chunk.id)
+        validChunkIds: sessionPlan.steps.map((chunk) => chunk.id),
+        plannedChunkCount: sessionPlan.steps.length,
+        taskKind: sessionPlan.kind,
+        sourceStatus
       },
       selectedMinutes: body.selectedMinutes,
       elapsedSeconds: body.elapsedSeconds,

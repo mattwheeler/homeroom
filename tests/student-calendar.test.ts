@@ -41,8 +41,7 @@ describe("student month and agenda calendar", () => {
     expect(html).toContain("categorySchoolwork");
     expect(html).toContain("categoryEvent");
     expect(html).not.toContain("Map Evidence Organizer");
-    expect(html).toContain("Guardian assist");
-    expect(html).toContain("source-backed");
+    expect(html).toContain("May need a parent");
   });
 
   it("keeps an empty selected day calm instead of showing the whole month", () => {

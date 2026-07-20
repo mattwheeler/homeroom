@@ -3,7 +3,11 @@ import { env } from "cloudflare:workers";
 import { handleCreateSession } from "../../../lib/http/session-handler";
 import { D1FixedWindowRateLimiter } from "../../../lib/security/rate-limit";
 import { D1SessionStore } from "../../../lib/storage/session-store";
-import { D1PrincipalStore } from "../../../lib/storage/principal-store";
+import {
+  D1ExistingHouseholdPrincipalResolver,
+  D1PrincipalStore,
+  type HouseholdBootstrap
+} from "../../../lib/storage/principal-store";
 import { readCookie } from "../../../lib/security/http";
 import { verifyIdentityToken, type VerifiedIdentity } from "../../../lib/security/identity-token";
 import { StructuredLogger } from "../../../lib/observability/logger";
@@ -38,15 +42,18 @@ export async function POST(request: Request) {
       { status: 503, headers: { "cache-control": "no-store" } }
     );
   }
+  const household: HouseholdBootstrap = {
+    guardianEmail,
+    studentEmail,
+    guardianName: "Matt",
+    studentName: "Emily",
+    householdName: "Wheeler family"
+  };
   return handleCreateSession(request, {
     store: new D1SessionStore(env.HOMEROOM_DB),
-    principalResolver: new D1PrincipalStore(env.HOMEROOM_DB, {
-      guardianEmail,
-      studentEmail,
-      guardianName: "Matt",
-      studentName: "Emily",
-      householdName: "Wheeler family"
-    }),
+    principalResolver: identity?.provider === "judge"
+      ? new D1ExistingHouseholdPrincipalResolver(household)
+      : new D1PrincipalStore(env.HOMEROOM_DB, household),
     signingSecret: env.SESSION_SIGNING_SECRET,
     rateLimiter: new D1FixedWindowRateLimiter(env.HOMEROOM_DB, {
       limit: 8,

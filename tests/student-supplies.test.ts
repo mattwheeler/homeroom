@@ -5,8 +5,8 @@ describe("student source-backed supplies experience", () => {
   it("shows attributed official lines and explicitly refuses generated additions", async () => {
     const source = await readFile(new URL("../app/components/student-supplies.tsx", import.meta.url), "utf8");
     expect(source).toContain("From your school’s official list");
-    expect(source).toContain("Homeroom did not add or guess any item");
-    expect(source).toContain("item.quantity === null");
+    expect(source).toContain("Checking items here does not change the original school page");
+    expect(source).toContain("item.quantity !== null");
     expect(source).not.toContain("list.sourceUrl");
     expect(source).toContain("StudentOutboundGuard");
     expect(source).toContain('item.kind === "group_label"');

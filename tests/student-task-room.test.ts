@@ -7,7 +7,9 @@ import {
   createTaskRoomState,
   taskRoomReducer
 } from "../app/components/student-task-room";
+import type { FocusBlockRecord } from "../lib/storage/focus-block-store";
 import type { StudentSourceProjection } from "../lib/domain/student-source-projection";
+import { buildTaskSessionPlan } from "../lib/domain/task-session-plan";
 
 type Priority = StudentSourceProjection["priorities"][number];
 
@@ -79,7 +81,7 @@ const packingPriority: Priority = {
 };
 
 describe("StudentTaskRoom", () => {
-  it("turns a live priority into an evidence-backed, three-step workroom", () => {
+  it("turns a live priority into an evidence-backed, task-specific workroom", () => {
     const html = renderToStaticMarkup(createElement(StudentTaskRoomContent, {
       priority: packingPriority,
       onClose: vi.fn()
@@ -93,14 +95,54 @@ describe("StudentTaskRoom", () => {
     expect(html).toContain("Use the director’s list to pack your instrument");
     expect(html).toContain("Ask your guardian to open");
     expect(html).not.toContain("href=");
-    expect(html).toContain("Gather");
-    expect(html).toContain("Compare each item with the director&#x27;s checklist.");
-    expect(html).toContain("Place by the door");
-    expect(html).toContain("0 of 3 chunks complete");
+    expect(html).toMatch(/Check the list|Find what is missing|Get items ready/);
+    expect(html).toContain("CURRENT STEP");
+    expect(html).toContain("See the full plan");
+    expect(html).toContain("Assignment details");
+    expect(html).toContain("My private work");
+    expect(html).toContain("Pause and save");
+    expect(html).toContain("0 of");
     expect(html).toContain("Homeroom never submits or changes this assignment");
-    expect(html).toContain("Your focus will be saved so Homeroom can help you return without judgment.");
+    expect(html).toContain("Your session will be saved when you end it.");
+    expect(html).not.toContain("Finish focus block");
+    expect(html).not.toContain("End this focus session");
+    expect((html.match(/>NOW</g) ?? [])).toHaveLength(1);
     expect(html).toContain('data-testid="task-room-focus-rail"');
     expect(html).toContain('data-testid="task-room-work-area"');
+  });
+
+  it("shows prior work and can resume a partial session without claiming the assignment is complete", () => {
+    const prior: FocusBlockRecord = {
+      id: "focus_01",
+      studentId: "student_01",
+      sessionId: "session_01",
+      taskId: packingPriority.id,
+      taskTitle: packingPriority.title,
+      courseName: packingPriority.course.name,
+      sourceProvider: "google_classroom",
+      sourceExternalId: "packing",
+      estimatedMinutes: 20,
+      selectedMinutes: 15,
+      elapsedSeconds: 420,
+      completedChunkIds: ["packing:checklist_preparation:review_list"],
+      completedChunkCount: 1,
+      plannedChunkCount: 4,
+      taskKind: "checklist_preparation",
+      sourceStatus: "Not submitted",
+      completedAt: "2026-07-19T16:00:00.000Z"
+    };
+    const html = renderToStaticMarkup(createElement(StudentTaskRoomContent, {
+      priority: packingPriority,
+      onClose: vi.fn(),
+      previousSessions: [prior],
+      resumeSession: prior
+    }));
+
+    expect(html).toContain("Previous sessions");
+    expect(html).toContain("7 min worked");
+    expect(html).toContain("1 of 4 steps");
+    expect(html).toContain("Not submitted");
+    expect(html).not.toContain("assignment complete");
   });
 
   it("shows the course Learning room as a secondary action only when it can be opened", () => {
@@ -118,30 +160,36 @@ describe("StudentTaskRoom", () => {
       onOpenLearning: vi.fn()
     }));
 
-    expect(withLearning).toContain("Open a guided Learning session");
-    expect(withoutLearning).not.toContain("Open a guided Learning session");
+    expect(withLearning).toContain("Need a lesson on this?");
+    expect(withoutLearning).not.toContain("Need a lesson on this?");
   });
 
   it("advances to the next visible chunk as work is checked off", () => {
-    const chunkIds = packingPriority.chunks.map((chunk) => chunk.id);
+    const chunkIds = buildTaskSessionPlan({
+      externalId: packingPriority.source.externalId,
+      title: packingPriority.title,
+      directions: packingPriority.directions,
+      selectedMinutes: packingPriority.effort.recommendedTimeboxMinutes,
+      maxSteps: 4
+    }).steps.map((chunk) => chunk.id);
     let state = createTaskRoomState(packingPriority);
 
-    expect(state.selectedChunkId).toBe("packing:setup");
+    expect(state.selectedChunkId).toBe(chunkIds[0]);
     state = taskRoomReducer(state, {
       type: "toggle_chunk",
-      chunkId: "packing:setup",
+      chunkId: chunkIds[0]!,
       orderedChunkIds: chunkIds
     });
-    expect(state.completedChunkIds).toEqual(["packing:setup"]);
-    expect(state.selectedChunkId).toBe("packing:focus");
+    expect(state.completedChunkIds).toEqual([chunkIds[0]]);
+    expect(state.selectedChunkId).toBe(chunkIds[1]);
 
     state = taskRoomReducer(state, {
       type: "toggle_chunk",
-      chunkId: "packing:setup",
+      chunkId: chunkIds[0]!,
       orderedChunkIds: chunkIds
     });
     expect(state.completedChunkIds).toEqual([]);
-    expect(state.selectedChunkId).toBe("packing:setup");
+    expect(state.selectedChunkId).toBe(chunkIds[0]);
   });
 
   it("supports choosing, starting, pausing, resuming, and safely expiring a timebox", () => {

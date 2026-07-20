@@ -14,6 +14,7 @@ import {
 } from "../../lib/domain/band-program-sources";
 import styles from "./guardian-setup.module.css";
 import { GuardianInbox } from "./guardian-inbox";
+import { GuardianProgress } from "./guardian-progress";
 import {
   guardianNavigationItems,
   guardianSectionFromHash,
@@ -428,7 +429,7 @@ export function GuardianSetupWorkspace() {
       const data = await response.json() as { connected?: boolean; itemCount?: number; error?: { message?: string } };
       if (!response.ok || !data.connected) throw new Error(apiError(data, "Unable to connect the official supply list."));
       await readWorkspace(csrfToken);
-      setMessage(`Official supply list connected with ${data.itemCount ?? 0} source-backed lines.`);
+      setMessage(`Connected ${data.itemCount ?? 0} items from the official supply list.`);
     } catch (caught) {
       setStatus("error");
       setMessage(caught instanceof Error ? caught.message : "Unable to connect the official supply list.");
@@ -449,9 +450,9 @@ export function GuardianSetupWorkspace() {
             <span className={styles.artBadge}><Shield /> Guardian controlled</span>
           </div>
           <p className={styles.eyebrow}>Guardian workspace</p>
-          <h1 id="guardian-entry-title">Set the support.<br />Emily keeps the agency.</h1>
+          <h1 id="guardian-entry-title">Set the support.<br />Emily stays in control.</h1>
           <p className={styles.entryCopy}>
-            Configure learning support, safety, privacy, and read-only school sources from a separate parent session.
+            Set learning support, safety, privacy, and school connections in the guardian workspace.
           </p>
           <button className={styles.primaryButton} type="button" onClick={beginGuardianSession} disabled={status === "loading"}>
             <Shield /> {status === "loading" ? "Opening workspace…" : "Continue as Matt"}
@@ -498,22 +499,23 @@ export function GuardianSetupWorkspace() {
           <section className={styles.hero}>
             <div>
               <p className={styles.eyebrow}>Emily’s support plan</p>
-              <h1>Build the structure.<br /><span>Keep her in control.</span></h1>
-              <p>Homeroom turns these settings into age-aware coaching in every plan and learning session.</p>
+              <h1>Support Emily.<br /><span>Keep her in control.</span></h1>
+              <p>These settings shape how Homeroom plans and coaches.</p>
             </div>
             <div className={styles.readinessGraphic} aria-label="Four guardian setup areas are ready">
               <div className={styles.readinessRing}><strong>4</strong><span>AREAS</span></div>
-              <p><strong>Support foundation</strong><small>Age-aware · visual-first · private</small></p>
+              <p><strong>Settings ready</strong><small>Age-aware · visual · private</small></p>
             </div>
           </section>
 
           <GuardianInbox csrfToken={csrfToken} />
+          <GuardianProgress progress={workspace.progress} />
 
           <section className={styles.card} id="household" aria-labelledby="student-profile-title" tabIndex={-1}>
             <span className={styles.anchorAlias} id="student-profile" aria-hidden="true" />
             <div className={styles.sectionHead}>
-              <div><p className={styles.eyebrow}>Household & student</p><h2 id="student-profile-title">Matt supports. Emily learns.</h2></div>
-              <span className={styles.policyPill}>Policy updates with age & grade</span>
+              <div><p className={styles.eyebrow}>Household & student</p><h2 id="student-profile-title">Your household</h2></div>
+              <span className={styles.policyPill}>Support adjusts with age and grade</span>
             </div>
             <div className={styles.householdGrid} aria-label="Current Homeroom household">
               <article className={styles.memberCard}>
@@ -529,7 +531,7 @@ export function GuardianSetupWorkspace() {
                 <p>Controls her learning work and chooses what, if anything, is shared with Matt.</p>
               </article>
             </div>
-            <p className={styles.futureNote}><strong>Current household:</strong> one guardian and one student. Additional family enrollment is planned for a future release and is not available in this build.</p>
+            <p className={styles.futureNote}>This version supports one guardian and one student.</p>
             <div className={styles.profileDivider}><span>Emily’s learning profile</span></div>
             <div className={styles.profileGrid}>
               <div className={styles.emilyCard}>
@@ -554,7 +556,7 @@ export function GuardianSetupWorkspace() {
             <div className={styles.skillMap}>{skills.map((skill, index) => <div className={styles.skillCard} key={skill.key}><div className={styles.skillTop}><span>{skill.glyph}</span><small>0{index + 1}</small></div><strong>{skill.label}</strong><p>{skill.verb}</p><select aria-label={`${skill.label} level`} value={settings.profile.executiveSkills[skill.key]} onChange={(event) => updateProfile({ executiveSkills: { ...settings.profile.executiveSkills, [skill.key]: event.target.value as GuardianSetupSettings["profile"]["executiveSkills"][ExecutiveSkillKey] } })}><option value="emerging">Emerging · more guidance</option><option value="developing">Developing · guided practice</option><option value="independent">Independent · check-ins</option></select></div>)}</div>
 
             <div className={styles.visualPanel}>
-              <div className={styles.visualCopy}><p className={styles.eyebrow}>Visual-first scaffolding</p><h3>See the path, then take the next step.</h3><p>Every session shows a roadmap, a visible timebox, task chunks, priority cues, and a worked example or organizer.</p></div>
+              <div className={styles.visualCopy}><p className={styles.eyebrow}>Visual learning support</p><h3>See the path, then take the next step.</h3><p>Sessions use roadmaps, timeboxes, task chunks, and visual examples.</p></div>
               <div className={styles.roadmap} aria-label="Example visual learning roadmap"><div><i>1</i><span>Plan<small>Choose time</small></span></div><div><i>2</i><span>Gather<small>Get ready</small></span></div><div><i>3</i><span>Focus<small>One chunk</small></span></div><div><i>4</i><span>Reflect<small>What worked?</small></span></div></div>
             </div>
 
@@ -582,8 +584,8 @@ export function GuardianSetupWorkspace() {
           </section>
 
           <section className={styles.card} id="school-sources" aria-labelledby="sources-title" tabIndex={-1}>
-            <div className={styles.sectionHead}><div><p className={styles.eyebrow}>Sources</p><h2 id="sources-title">Parent-owned, read-only connections</h2></div><span className={styles.readOnlyPill}>No write permissions</span></div>
-            <p className={styles.sectionIntro}>Every family starts with source types, then connects the provider their school or activity actually uses. Connections are configured here—not in the student workspace. Homeroom cannot post, submit, grade, edit, pay, or RSVP.</p>
+            <div className={styles.sectionHead}><div><p className={styles.eyebrow}>Sources</p><h2 id="sources-title">School and activity connections</h2></div><span className={styles.readOnlyPill}>Read only</span></div>
+            <p className={styles.sectionIntro}>Connect the services your school and activities use. Homeroom reads information but cannot make changes.</p>
             <div className={styles.sourceTypeGrid} aria-label="Source types supported by Homeroom">
               {supportedGuardianSourceTypes.map((sourceType) => (
                 <article key={sourceType.provider}>
@@ -596,7 +598,7 @@ export function GuardianSetupWorkspace() {
             </div>
             <div className={styles.sourceListHeading}>
               <span><strong>This household’s connections</strong><small>Emily and Matt’s current providers and setup state</small></span>
-              <span className={styles.householdExamplePill}>Wheeler household</span>
+              <span className={styles.householdExamplePill}>Current household</span>
             </div>
             <div className={styles.sourcesGrid}>{workspace.sources.map((source) => {
               const permissionKey = sourcePermissionKey(source.provider);
@@ -621,14 +623,14 @@ export function GuardianSetupWorkspace() {
                       }
                     }))}
                     label="Allow this source"
-                    description="Guardian-managed read-only access."
+                    description="You control this connection."
                   />
                   {source.provider === "google_classroom" && (source.status === "active"
                     ? <button className={styles.sourceAction} type="button" disabled={isBusy} onClick={() => void syncSource(source.provider)}>Refresh Classroom</button>
                     : <button className={styles.sourceAction} type="button" disabled={isBusy || !permission.enabled} onClick={() => void connectGoogle()}>{status === "connecting" ? "Opening Google…" : "Connect Google Classroom"}</button>)}
                   {source.provider === "band_ical" && (source.status === "active"
                     ? <button className={styles.sourceAction} type="button" disabled={isBusy} onClick={() => void syncSource(source.provider)}>Refresh band calendar</button>
-                    : <div className={styles.bandConnect}><label htmlFor="guardian-band-url">Private HTTPS iCalendar URL</label><div><input id="guardian-band-url" type="url" inputMode="url" autoComplete="off" maxLength={2_048} placeholder="BAND, CutTime, or compatible calendar feed" value={bandUrl} onChange={(event) => setBandUrl(event.target.value)} /><button className={styles.sourceAction} type="button" disabled={isBusy || !permission.enabled || !bandUrl.trim()} onClick={() => void connectBand()}>Connect calendar</button></div><small>The Wheeler household uses band-program calendar tools; another family can use any compatible feed supported by this connector.</small></div>)}
+                    : <div className={styles.bandConnect}><label htmlFor="guardian-band-url">Private HTTPS iCalendar URL</label><div><input id="guardian-band-url" type="url" inputMode="url" autoComplete="off" maxLength={2_048} placeholder="BAND, CutTime, or compatible calendar feed" value={bandUrl} onChange={(event) => setBandUrl(event.target.value)} /><button className={styles.sourceAction} type="button" disabled={isBusy || !permission.enabled || !bandUrl.trim()} onClick={() => void connectBand()}>Connect calendar</button></div><small>Use a private calendar feed from BAND, CutTime, or another supported service.</small></div>)}
                   {source.provider === "school_calendar" && (source.status === "active"
                     ? <button className={styles.sourceAction} type="button" disabled={isBusy} onClick={() => void syncSource(source.provider)}>Refresh district + school events</button>
                     : <div className={styles.bandConnect}>
@@ -637,7 +639,7 @@ export function GuardianSetupWorkspace() {
                         <label htmlFor="guardian-district-calendar-url">Official district calendar page</label>
                         <input id="guardian-district-calendar-url" type="url" maxLength={2_048} placeholder="https://your-district.example/calendar" value={districtCalendarUrl} onChange={(event) => setDistrictCalendarUrl(event.target.value)} />
                         <button className={styles.sourceAction} type="button" disabled={isBusy || !permission.enabled || !schoolUrl.trim() || !districtCalendarUrl.trim()} onClick={() => void connectSchoolCalendar()}>Connect official calendars</button>
-                        <small>The verified page connector currently accepts Comal ISD official pages. Other district connectors are future work.</small>
+                        <small>Supported now: official Comal ISD school and district pages.</small>
                       </div>)}
                   {source.provider === "school_supplies" && <div className={styles.bandConnect}>
                     <label htmlFor="guardian-supply-url">Official school or course supply-list page</label>
@@ -646,7 +648,7 @@ export function GuardianSetupWorkspace() {
                       <button className={styles.sourceAction} type="button" disabled={isBusy || !permission.enabled || !supplyUrl.trim()} onClick={() => void connectSupplyList()}>{source.status === "active" ? "Add another official list" : "Connect supply list"}</button>
                       {source.status === "active" && <button className={styles.sourceAction} type="button" disabled={isBusy} onClick={() => void syncSource(source.provider)}>Refresh all lists</button>}
                     </div>
-                    <small>Only lines on the official page are shown. Homeroom never fills in missing items or quantities.</small>
+                    <small>Homeroom shows only items found on the official page.</small>
                   </div>}
                 </article>
               );
@@ -654,9 +656,9 @@ export function GuardianSetupWorkspace() {
 
             <div className={styles.bandSourceMap}>
               <div className={styles.bandSourceMapHeading}>
-                <p className={styles.eyebrow}>This household’s connected examples</p>
-                <h3>Emily’s Pieper, Comal, and band-program tools</h3>
-                <p>These are Wheeler household examples, not required Homeroom providers. Each approved read path has one honest job.</p>
+                <p className={styles.eyebrow}>Connected resources</p>
+                <h3>School and activity tools</h3>
+                <p>Review the resources connected for this household.</p>
               </div>
               <div className={styles.bandResourceGrid}>
                 {bandProgramSources.map((source) => (

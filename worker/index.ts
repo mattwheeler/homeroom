@@ -1,4 +1,5 @@
 import handler from "vinext/server/app-router-entry";
+import { hardenResponse } from "../lib/security/response-headers";
 
 interface ExecutionContextLike {
   waitUntil(promise: Promise<unknown>): void;
@@ -17,18 +18,23 @@ interface WorkerBindingsLike {
   CRON_SECRET?: string;
   RESEND_API_KEY?: string;
   GUARDIAN_DIGEST_FROM?: string;
+  JUDGE_ACCESS_CODE?: string;
+  HOMEROOM_RELEASE_SHA?: string;
+  CF_VERSION_METADATA?: { id: string; tag?: string; timestamp?: string };
 }
 
 const worker = {
-  fetch(request: Request, bindings: WorkerBindingsLike, context: ExecutionContextLike) {
-    return handler.fetch(request, bindings, context);
+  async fetch(request: Request, bindings: WorkerBindingsLike, context: ExecutionContextLike) {
+    return hardenResponse(await handler.fetch(request, bindings, context), request.url);
   },
   scheduled(_event: unknown, bindings: WorkerBindingsLike, context: ExecutionContextLike) {
     if (!bindings.CRON_SECRET) return;
     context.waitUntil(handler.fetch(new Request("https://homeroom.internal/api/cron/guardian-digest", {
       method: "POST",
       headers: { "x-homeroom-cron": bindings.CRON_SECRET }
-    }), bindings, context).then(() => undefined));
+    }), bindings, context).then((response) => {
+      if (!response.ok) console.error("scheduled_guardian_digest_failed", { status: response.status });
+    }));
   }
 };
 

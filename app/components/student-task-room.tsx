@@ -12,6 +12,8 @@ import { createPortal } from "react-dom";
 
 import type { CourseId } from "../../lib/domain/learning-tracks";
 import type { StudentSourceProjection } from "../../lib/domain/student-source-projection";
+import { buildTaskSessionPlan } from "../../lib/domain/task-session-plan";
+import type { FocusBlockRecord } from "../../lib/storage/focus-block-store";
 import styles from "./student-task-room.module.css";
 import { StudentOutboundGuard } from "./student-outbound-guard";
 
@@ -49,13 +51,37 @@ export interface StudentTaskRoomProps {
   onClose: () => void;
   onFinish?: (result: StudentTaskRoomResult) => void;
   onOpenLearning?: (courseId: CourseId) => void;
+  previousSessions?: readonly FocusBlockRecord[];
+  resumeSession?: FocusBlockRecord | null;
 }
 
-export function createTaskRoomState(priority: StudentTaskPriority): TaskRoomState {
-  const timeboxMinutes = Math.max(1, priority.effort.recommendedTimeboxMinutes);
+function planFor(priority: StudentTaskPriority, selectedMinutes: number) {
+  return buildTaskSessionPlan({
+    externalId: priority.source.externalId,
+    title: priority.title,
+    directions: priority.directions,
+    taskKind: priority.sessionPlan?.kind,
+    selectedMinutes,
+    maxSteps: priority.sessionPlan?.maxSteps ?? Math.max(2, priority.chunks.length)
+  });
+}
+
+export function createTaskRoomState(
+  priority: StudentTaskPriority,
+  resumeSession?: FocusBlockRecord | null
+): TaskRoomState {
+  const timeboxMinutes = Math.max(
+    1,
+    resumeSession?.selectedMinutes ?? priority.effort.recommendedTimeboxMinutes
+  );
+  const plan = planFor(priority, timeboxMinutes);
+  const visibleIds = new Set(plan.steps.map((step) => step.id));
+  const completedChunkIds = (resumeSession?.completedChunkIds ?? []).filter((id) => visibleIds.has(id));
   return {
-    selectedChunkId: priority.chunks[0]?.id ?? "",
-    completedChunkIds: [],
+    selectedChunkId: plan.steps.find((step) => !completedChunkIds.includes(step.id))?.id
+      ?? plan.steps[0]?.id
+      ?? "",
+    completedChunkIds,
     timeboxMinutes,
     remainingSeconds: timeboxMinutes * 60,
     timerStatus: "idle"
@@ -154,25 +180,79 @@ function timerButtonLabel(status: TimerStatus): string {
   return "Start focus timer";
 }
 
+function sourcedChecklistItems(directions: string): string[] {
+  const sourceText = directions
+    .replace(/^.*?\b(?:pack|confirm|bring|gather)\b\s*/i, "")
+    .replace(/[.!?]+$/, "");
+  const items = sourceText
+    .split(/,\s*|\s+and\s+/i)
+    .map((item) => item.replace(/^and\s+/i, "").trim())
+    .filter((item) => item.length >= 2 && item.length <= 80);
+  return items.length >= 2 ? items.slice(0, 10) : [directions];
+}
+
+function PrivateWorkSurface({ kind, directions }: { kind: string; directions: string }) {
+  const [draft, setDraft] = useState("");
+  const [readyItems, setReadyItems] = useState<string[]>([]);
+  const checklist = useMemo(() => sourcedChecklistItems(directions), [directions]);
+  if (kind === "checklist_preparation") {
+    return (
+      <section className={styles.privateWork} aria-labelledby="private-work-title">
+        <div><p>My private work</p><h3 id="private-work-title">Check what is ready</h3><span>These checkmarks stay in this browser session.</span></div>
+        <ul>
+          {checklist.map((item) => (
+            <li key={item}>
+              <label><input type="checkbox" checked={readyItems.includes(item)} onChange={() => setReadyItems((current) => current.includes(item) ? current.filter((value) => value !== item) : [...current, item])} /><span>{item}</span></label>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+  const label = kind === "writing"
+    ? "Draft this step"
+    : kind === "math_problem_set"
+      ? "Scratch work"
+      : kind === "vocabulary"
+        ? "Words I’m working with"
+        : "Notes for this step";
+  return (
+    <section className={styles.privateWork} aria-labelledby="private-work-title">
+      <div><p>My private work</p><h3 id="private-work-title">{label}</h3><span>This stays in this browser session. It is not shared with your guardian.</span></div>
+      <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1200} aria-label={label} placeholder="Start with one small part…" />
+    </section>
+  );
+}
+
 export function StudentTaskRoomContent({
   priority,
   onClose,
   onFinish,
-  onOpenLearning
+  onOpenLearning,
+  previousSessions = [],
+  resumeSession = null
 }: StudentTaskRoomProps) {
-  const [state, dispatch] = useReducer(taskRoomReducer, priority, createTaskRoomState);
+  const [state, dispatch] = useReducer(
+    taskRoomReducer,
+    { priority, resumeSession },
+    ({ priority: initialPriority, resumeSession: initialResume }) => createTaskRoomState(initialPriority, initialResume)
+  );
   const [finished, setFinished] = useState(false);
   const dialogRef = useRef<HTMLElement>(null);
   const priorFocusRef = useRef<HTMLElement | null>(null);
-  const chunkIds = useMemo(() => priority.chunks.map((chunk) => chunk.id), [priority.chunks]);
+  const sessionPlan = useMemo(
+    () => planFor(priority, state.timeboxMinutes),
+    [priority, state.timeboxMinutes]
+  );
+  const chunks = sessionPlan.steps;
+  const currentChunk = chunks.find((chunk) => chunk.id === state.selectedChunkId) ?? chunks[0];
+  const chunkIds = useMemo(() => chunks.map((chunk) => chunk.id), [chunks]);
   const completedCount = state.completedChunkIds.length;
-  const allComplete = priority.chunks.length > 0 && completedCount === priority.chunks.length;
+  const allComplete = chunks.length > 0 && completedCount === chunks.length;
+  const canEndSession = completedCount > 0;
   const totalSeconds = state.timeboxMinutes * 60;
   const elapsedSeconds = Math.max(0, totalSeconds - state.remainingSeconds);
   const timeRemainingRatio = totalSeconds > 0 ? state.remainingSeconds / totalSeconds : 0;
-  const selectedChunk = priority.chunks.find((chunk) => chunk.id === state.selectedChunkId)
-    ?? priority.chunks[0]
-    ?? null;
 
   useEffect(() => {
     if (state.timerStatus !== "running") return;
@@ -228,7 +308,7 @@ export function StudentTaskRoomContent({
   }
 
   function finishTaskRoom() {
-    if (!allComplete || finished) return;
+    if (!canEndSession || finished) return;
     if (state.timerStatus === "running") dispatch({ type: "pause_timer" });
     setFinished(true);
     onFinish?.({
@@ -271,7 +351,7 @@ export function StudentTaskRoomContent({
               {priority.rank}
             </div>
             <div>
-              <p>{priority.priorityBand === "do_first" ? "DO FIRST" : priority.priorityBand === "plan_next" ? "PLAN NEXT" : "LATER"}</p>
+              <p>{priority.priorityBand === "do_first" ? "TODAY" : priority.priorityBand === "plan_next" ? "COMING UP" : "LATER"}</p>
               <h1 id="student-task-room-title">{priority.title}</h1>
               <div className={styles.evidence} aria-label="Task evidence">
                 <span>{priority.course.name}</span>
@@ -286,25 +366,75 @@ export function StudentTaskRoomContent({
             <section className={styles.finished} aria-live="polite">
               <span aria-hidden="true">✓</span>
               <div>
-                <p>FOCUS BLOCK COMPLETE</p>
-                <h2>You worked through all {priority.chunks.length} chunks.</h2>
-                <small>This progress is saved in Homeroom only. Nothing was submitted to {providerLabel(priority.source.provider)}.</small>
+                <p>FOCUS SESSION SAVED</p>
+                <h2>You worked through {completedCount} of {chunks.length} steps.</h2>
+                <small>Your place is saved in Homeroom. This does not mark the assignment complete or submit anything to {providerLabel(priority.source.provider)}.</small>
               </div>
               <button type="button" onClick={onClose}>Return to Today</button>
             </section>
           ) : (
             <div className={styles.layout}>
+              <section className={styles.workArea} data-testid="task-room-work-area">
+                {currentChunk && (
+                  <section className={styles.currentStep} aria-labelledby="current-step-title">
+                    <header>
+                      <div className={styles.currentBadge}><span>NOW</span><strong>{currentChunk.order}</strong></div>
+                      <div><p>CURRENT STEP · {currentChunk.minutes} MIN</p><h2 id="current-step-title">{currentChunk.label}</h2><span>{currentChunk.action}</span></div>
+                    </header>
+                    <PrivateWorkSurface kind={sessionPlan.kind} directions={priority.directions ?? ""} />
+                    <footer>
+                      <label>
+                        <input type="checkbox" checked={state.completedChunkIds.includes(currentChunk.id)} onChange={() => toggleChunk(currentChunk.id)} />
+                        <span>{state.completedChunkIds.includes(currentChunk.id) ? "Step complete" : "Mark this step complete"}</span>
+                      </label>
+                      {priority.course.trackCourseId && onOpenLearning && (
+                        <button className={styles.contextHelp} type="button" onClick={() => onOpenLearning(priority.course.trackCourseId as CourseId)}>Need a lesson on this?</button>
+                      )}
+                    </footer>
+                  </section>
+                )}
+
+                <details className={styles.planOverview}>
+                  <summary><span><strong>See the full plan</strong><small>{completedCount} of {chunks.length} steps complete</small></span><span aria-hidden="true">⌄</span></summary>
+                  <ol className={styles.chunkList}>
+                    {chunks.map((chunk) => {
+                      const complete = state.completedChunkIds.includes(chunk.id);
+                      const selected = state.selectedChunkId === chunk.id;
+                      return (
+                        <li key={chunk.id} className={`${complete ? styles.complete : ""} ${selected ? styles.selected : ""}`} aria-current={selected ? "step" : undefined}>
+                          <button className={styles.chunkSelect} type="button" aria-pressed={selected} onClick={() => dispatch({ type: "select_chunk", chunkId: chunk.id })}>
+                            <span>{complete ? "✓" : chunk.order}</span>
+                            <div><small>{chunk.minutes} min · {chunk.skill.replace("_", " ")}</small><strong>{chunk.label}</strong><p>{chunk.action}</p></div>
+                          </button>
+                          <label><input type="checkbox" checked={complete} onChange={() => toggleChunk(chunk.id)} /><span>{complete ? "Completed" : "Mark complete"}</span></label>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </details>
+
+                <details className={styles.assignmentDetails}>
+                  <summary><strong>Assignment details</strong><span>{providerLabel(priority.source.provider)} · {dueLabel(priority)}</span></summary>
+                  <div className={styles.directions}>
+                    <div><p>ASSIGNMENT</p><h2>Directions</h2><strong>{priority.directions || (priority.outbound?.policy === "guardian_approval" ? "The school source did not include written directions. Ask your guardian to help review the original assignment before you begin." : "The school source did not include written directions. External source access is blocked, so pause and ask your guardian or teacher what to do next.")}</strong></div>
+                    <ul aria-label="Why Homeroom recommended this assignment">{priority.rationale.signals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
+                  </div>
+                  <div className={styles.sourceDetail}><strong>Original source: {providerLabel(priority.source.provider)}</strong><span>Homeroom never submits or changes this assignment.</span>{priority.outbound?.available && <StudentOutboundGuard policy={priority.outbound.policy} resourceLabel="original assignment" />}</div>
+                </details>
+
+                <footer className={styles.actions}>
+                  <div><strong>{allComplete ? "All session steps are checked." : canEndSession ? "Your place is ready to save." : "Complete one visible step before saving this session."}</strong><small>This saves Homeroom progress only. The school source still controls assignment status.</small></div>
+                  <button className={styles.finishButton} type="button" disabled={!canEndSession} onClick={finishTaskRoom}>{allComplete ? "Save finished session" : "Pause and save"}</button>
+                </footer>
+              </section>
+
               <aside className={styles.focusRail} aria-label="Task progress and timer" data-testid="task-room-focus-rail">
                 <section className={styles.progressCard}>
                   <div className={styles.sectionLabel}><span aria-hidden="true">✓</span><strong>Your progress</strong></div>
-                  <strong>{completedCount} of {priority.chunks.length} chunks complete</strong>
-                  <progress value={completedCount} max={Math.max(1, priority.chunks.length)}>
-                    {completedCount} of {priority.chunks.length}
-                  </progress>
-                  <small>Check off one visible chunk at a time.</small>
-                  <small>Your focus will be saved so Homeroom can help you return without judgment.</small>
+                  <strong>{completedCount} of {chunks.length} steps complete</strong>
+                  <progress value={completedCount} max={Math.max(1, chunks.length)}>{completedCount} of {chunks.length}</progress>
+                  <small>Your session will be saved when you end it.</small>
                 </section>
-
                 <section className={styles.timerCard} aria-labelledby="task-timer-heading">
                   <div className={styles.timerRing} style={ringStyle}>
                     <span role="timer" aria-label={`${displayTimer(state.remainingSeconds)} remaining`}>
@@ -313,7 +443,7 @@ export function StudentTaskRoomContent({
                   </div>
                   <div>
                     <p id="task-timer-heading">Focus timebox</p>
-                    <strong>{state.timerStatus === "running" ? "Stay with this chunk" : state.timerStatus === "paused" ? "Paused—your place is safe" : state.timerStatus === "elapsed" ? "Time is up—check your progress" : "Choose a short focus block"}</strong>
+                    <strong>{state.timerStatus === "running" ? "Stay with this chunk" : state.timerStatus === "paused" ? "Paused. Resume when ready." : state.timerStatus === "elapsed" ? "Time is up—check your progress" : "Choose a short focus block"}</strong>
                   </div>
                   <div className={styles.timeChoices} aria-label="Choose timebox length">
                     {timeboxOptions(priority.effort.recommendedTimeboxMinutes).map((minutes) => (
@@ -335,106 +465,13 @@ export function StudentTaskRoomContent({
                     </button>
                   )}
                 </section>
-
-                <section className={styles.sourceCard}>
-                  <p>Original source</p>
-                  <strong>{providerLabel(priority.source.provider)}</strong>
-                  <small>Homeroom never submits or changes this assignment.</small>
-                  {priority.outbound?.available && (
-                    <StudentOutboundGuard policy={priority.outbound.policy} resourceLabel="original assignment" />
-                  )}
-                </section>
-              </aside>
-
-              <section className={styles.workArea} data-testid="task-room-work-area">
-                <section className={styles.directions} aria-labelledby="task-directions-heading">
-                  <div>
-                    <p>WHAT THIS ASSIGNMENT IS</p>
-                    <h2 id="task-directions-heading">Directions</h2>
-                    <strong>{priority.directions || (priority.outbound?.policy === "guardian_approval"
-                      ? "The school source did not include written directions. Ask your guardian to help review the original assignment before you begin."
-                      : "The school source did not include written directions. External source access is blocked, so pause and ask your guardian or teacher what to do next.")}</strong>
-                  </div>
-                  <ul aria-label="Why Homeroom recommended this assignment">
-                    {priority.rationale.signals.map((signal) => <li key={signal}>{signal}</li>)}
-                  </ul>
-                </section>
-
-                {selectedChunk && (
-                  <section className={styles.nowCard} aria-live="polite">
-                    <span>NOW</span>
-                    <div>
-                      <small>{selectedChunk.minutes}-minute chunk · {selectedChunk.skill.replace("_", " ")}</small>
-                      <h2>{selectedChunk.label}</h2>
-                      <p>{selectedChunk.action}</p>
-                    </div>
-                  </section>
+                {previousSessions.length > 0 && (
+                  <details className={styles.historyCard}>
+                    <summary>Previous sessions</summary>
+                    <ul>{previousSessions.slice(0, 3).map((session) => <li key={session.id}><strong>{Math.max(1, Math.round(session.elapsedSeconds / 60))} min worked</strong><span>{session.completedChunkCount} of {session.plannedChunkCount} steps · {session.sourceStatus}</span></li>)}</ul>
+                  </details>
                 )}
-
-                <section className={styles.chunkSection} aria-labelledby="task-chunks-heading">
-                  <div className={styles.chunkHeading}>
-                    <div>
-                      <p>ORGANIZE THE WORK</p>
-                      <h2 id="task-chunks-heading">Your {priority.chunks.length}-step checklist</h2>
-                    </div>
-                    <span>Choose a step to focus it</span>
-                  </div>
-                  <ol className={styles.chunkList}>
-                    {priority.chunks.map((chunk) => {
-                      const complete = state.completedChunkIds.includes(chunk.id);
-                      const selected = state.selectedChunkId === chunk.id;
-                      return (
-                        <li
-                          key={chunk.id}
-                          className={`${complete ? styles.complete : ""} ${selected ? styles.selected : ""}`}
-                          aria-current={selected ? "step" : undefined}
-                        >
-                          <button
-                            className={styles.chunkSelect}
-                            type="button"
-                            aria-pressed={selected}
-                            onClick={() => dispatch({ type: "select_chunk", chunkId: chunk.id })}
-                          >
-                            <span>{complete ? "✓" : chunk.order}</span>
-                            <div>
-                              <small>{chunk.minutes} min · {chunk.skill.replace("_", " ")}</small>
-                              <strong>{chunk.label}</strong>
-                              <p>{chunk.action}</p>
-                            </div>
-                          </button>
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={complete}
-                              onChange={() => toggleChunk(chunk.id)}
-                            />
-                            <span>{complete ? "Completed" : "Mark complete"}</span>
-                          </label>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                </section>
-
-                <footer className={styles.actions}>
-                  <div>
-                    <strong>{allComplete ? "All chunks checked—nice follow-through." : `Finish ${priority.chunks.length - completedCount} more chunk${priority.chunks.length - completedCount === 1 ? "" : "s"} to complete this focus block.`}</strong>
-                    <small>Completion stays in Homeroom. You still submit schoolwork in the school tool.</small>
-                  </div>
-                  <div>
-                    {priority.course.trackCourseId && onOpenLearning && (
-                      <button
-                        className={styles.learningButton}
-                        type="button"
-                        onClick={() => onOpenLearning(priority.course.trackCourseId as CourseId)}
-                      >Open a guided Learning session</button>
-                    )}
-                    <button className={styles.finishButton} type="button" disabled={!allComplete} onClick={finishTaskRoom}>
-                      Finish focus block
-                    </button>
-                  </div>
-                </footer>
-              </section>
+              </aside>
             </div>
           )}
         </main>

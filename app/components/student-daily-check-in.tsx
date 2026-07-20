@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import {
   buildStudentDailyCheckIn,
@@ -70,15 +70,17 @@ function ChoiceCard({ choice, onAction, recommended = false }: {
   );
 }
 
-export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, onAction }: {
+export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, onAction, primaryContent }: {
   studentName: string;
   projection: StudentSourceProjection;
   csrfToken?: string;
   now?: Date;
   onAction?: (action: StudentCheckInAction) => void;
+  primaryContent?: ReactNode;
 }) {
   const [focus, setFocus] = useState<FocusState | null>(null);
   const [message, setMessage] = useState("");
+  const [composerOpen, setComposerOpen] = useState(!primaryContent);
   const [aiStatus, setAiStatus] = useState<"idle" | "sending" | "complete" | "error">("idle");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [aiError, setAiError] = useState("");
@@ -164,29 +166,26 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
   function chooseFocusStarter(choice: (typeof focusChoices)[number]) {
     const isSelected = focus === choice.id;
     setFocus(isSelected ? null : choice.id);
+    setComposerOpen(true);
     setMessage((current) => {
       if (isSelected) return current === choice.prompt ? "" : current;
       return choice.prompt;
     });
   }
 
-  return (
-    <section className={styles.checkIn} aria-labelledby="student-daily-check-in-title">
-      <div className={styles.heading}>
-        <div>
-          <p>YOUR LIVE CHECK-IN</p>
-          <h1 id="student-daily-check-in-title">{checkIn.greeting}</h1>
-          <span>{checkIn.context}</span>
-        </div>
-        <div className={styles.sourceSignal} aria-label="Based on connected school sources">
-          <i aria-hidden="true">✓</i><span><strong>Live sources checked</strong><small>No guessed deadlines or events</small></span>
-        </div>
-      </div>
+  function openCustomCheckIn() {
+    setFocus(null);
+    setComposerOpen(true);
+    setMessage((current) => focusChoices.some((choice) => choice.prompt === current) ? "" : current);
+  }
 
-      <section className={styles.aiCheckIn} aria-labelledby="student-ai-check-in-title">
+  const showComposer = !primaryContent || composerOpen || conversation.length > 0 || aiStatus !== "idle" || Boolean(aiError);
+
+  const coachingPanel = (
+    <section className={styles.aiCheckIn} data-testid="today-coaching-panel" aria-labelledby="student-ai-check-in-title">
         <header>
-          <div><p>PRIVATE AI COACHING</p><h2 id="student-ai-check-in-title">Talk it through with Homeroom</h2></div>
-          {conversation.length > 0 && <button type="button" onClick={() => { setConversation([]); setFocus(null); setMessage(""); setAiError(""); }}>Start over</button>}
+          <div><p>PRIVATE CHECK-IN</p><h2 id="student-ai-check-in-title">Talk it through with Homeroom</h2></div>
+          {conversation.length > 0 && <button type="button" onClick={() => { setConversation([]); setFocus(null); setMessage(""); setComposerOpen(!primaryContent); setAiError(""); }}>Start over</button>}
         </header>
         {conversation.length > 0 && (
           <div className={styles.conversation} role="log" aria-live="polite" aria-label="Conversation with Homeroom">
@@ -194,7 +193,7 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
               <article key={turn.id} className={styles.studentTurn}><strong>You</strong><p>{turn.text}</p></article>
             ) : (
               <article key={turn.id} className={styles.homeroomTurn}>
-                <div><strong>Homeroom</strong><span>{turn.mode === "live" ? "AI response" : turn.mode === "safety" ? "Safety support" : "Quick support"}</span></div>
+                <div><strong>Homeroom</strong><span>{turn.mode === "live" ? "Check-in" : turn.mode === "safety" ? "Safety support" : "Quick support"}</span></div>
                 <p>{turn.message}</p>
                 {turn.followUpQuestion && <p>{turn.followUpQuestion}</p>}
                 {turn.suggestedAction === "ask_trusted_adult"
@@ -206,10 +205,10 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
           </div>
         )}
         <form onSubmit={(event) => { event.preventDefault(); void sendCheckIn(); }}>
-          <label htmlFor="student-check-in-message">What would you like help with right now?</label>
-          <p>Choose a starter to edit, or write your own message. Homeroom offers school-day coaching and motivation, and your conversation stays in this browser session.</p>
+          <div className={styles.checkInPrompt}>How are you arriving today?</div>
+          <p>Choose one if it helps. This private check-in is always optional.</p>
           <fieldset className={styles.focusStarters}>
-            <legend>Optional conversation starters</legend>
+            <legend>Conversation starters</legend>
             <div>
               {focusChoices.map((choice) => (
                 <button
@@ -221,33 +220,76 @@ export function StudentDailyCheckIn({ studentName, projection, csrfToken, now, o
                 >
                   <span aria-hidden="true">{choice.icon}</span>
                   <strong>{choice.label}</strong>
-                  <small>{choice.prompt}</small>
+                  {!primaryContent && <small>{choice.prompt}</small>}
                 </button>
               ))}
+              {primaryContent && (
+                <button
+                  type="button"
+                  aria-label="Something else…"
+                  aria-pressed={focus === null && composerOpen}
+                  onClick={openCustomCheckIn}
+                >
+                  <span aria-hidden="true">＋</span>
+                  <strong>Something else…</strong>
+                </button>
+              )}
             </div>
           </fieldset>
-          <textarea
-            id="student-check-in-message"
-            value={message}
-            maxLength={500}
-            rows={3}
-            disabled={aiStatus === "sending"}
-            placeholder={conversation.length > 0 ? "Reply to Homeroom…" : "For example: I know what to do, but I can’t get started."}
-            onChange={(event) => setMessage(event.target.value)}
-          />
-          <div><span>{message.length}/500</span><button type="submit" disabled={!message.trim() || !csrfToken || aiStatus === "sending"}>{aiStatus === "sending" ? "Homeroom is thinking…" : "Talk to Homeroom"}</button></div>
-          {aiError && <p className={styles.aiError} role="alert">{aiError}</p>}
+          {showComposer && (
+            <div className={styles.composer}>
+              <textarea
+                id="student-check-in-message"
+                aria-label="What would you like help with right now?"
+                value={message}
+                maxLength={500}
+                rows={primaryContent ? 2 : 3}
+                disabled={aiStatus === "sending"}
+                placeholder={conversation.length > 0 ? "Reply to Homeroom…" : "For example: I know what to do, but I can’t get started."}
+                onChange={(event) => setMessage(event.target.value)}
+              />
+              <div><span>{message.length}/500</span><button type="submit" disabled={!message.trim() || !csrfToken || aiStatus === "sending"}>{aiStatus === "sending" ? "Homeroom is thinking…" : "Talk to Homeroom"}</button></div>
+              {aiError && <p className={styles.aiError} role="alert">{aiError}</p>}
+            </div>
+          )}
         </form>
       </section>
+  );
 
-      <ChoiceCard choice={checkIn.recommended} onAction={onAction} recommended />
+  return (
+    <section
+      className={`${styles.checkIn} ${primaryContent ? styles.unifiedCheckIn : ""}`}
+      data-testid={primaryContent ? "today-unified-workspace" : undefined}
+      aria-labelledby="student-daily-check-in-title"
+    >
+      <div className={styles.heading}>
+        <div>
+          <p>TODAY</p>
+          <h1 id="student-daily-check-in-title">{checkIn.greeting}</h1>
+          <span>{checkIn.context}</span>
+        </div>
+        <div className={styles.sourceSignal} aria-label="Based on connected school sources">
+          <i aria-hidden="true">✓</i><span><strong>School apps updated</strong><small>Assignments and dates checked</small></span>
+        </div>
+      </div>
 
-      <details className={styles.alternatives}>
-        <summary>Show {checkIn.alternatives.length} other choices</summary>
-        <div>{checkIn.alternatives.map((choice) => (
-          <ChoiceCard key={choice.id} choice={choice} onAction={onAction} />
-        ))}</div>
-      </details>
+      {primaryContent ? (
+        <div className={styles.workspaceBody}>
+          {coachingPanel}
+          <div className={styles.primarySlot} data-testid="today-primary-column">{primaryContent}</div>
+        </div>
+      ) : (
+        <>
+          {coachingPanel}
+          <ChoiceCard choice={checkIn.recommended} onAction={onAction} recommended />
+          <details className={styles.alternatives}>
+            <summary>Show {checkIn.alternatives.length} other choices</summary>
+            <div>{checkIn.alternatives.map((choice) => (
+              <ChoiceCard key={choice.id} choice={choice} onAction={onAction} />
+            ))}</div>
+          </details>
+        </>
+      )}
     </section>
   );
 }

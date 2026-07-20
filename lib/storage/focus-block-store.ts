@@ -14,6 +14,9 @@ export interface FocusBlockRecord {
   elapsedSeconds: number;
   completedChunkIds: string[];
   completedChunkCount: number;
+  plannedChunkCount: number;
+  taskKind: string;
+  sourceStatus: string;
   completedAt: string;
 }
 
@@ -32,13 +35,15 @@ export class D1FocusBlockStore implements FocusBlockStore {
       `INSERT INTO focus_blocks (
         id, student_id, session_id, task_id, task_title, course_name, source_provider,
         source_external_id, estimated_minutes, selected_minutes, elapsed_seconds,
-        completed_chunk_ids_json, completed_chunk_count, completed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        completed_chunk_ids_json, completed_chunk_count, planned_chunk_count, task_kind,
+        source_status, completed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       record.id, record.studentId, record.sessionId, record.taskId, record.taskTitle,
       record.courseName, record.sourceProvider, record.sourceExternalId,
       record.estimatedMinutes, record.selectedMinutes, record.elapsedSeconds,
-      JSON.stringify(record.completedChunkIds), record.completedChunkCount, record.completedAt
+      JSON.stringify(record.completedChunkIds), record.completedChunkCount,
+      record.plannedChunkCount, record.taskKind, record.sourceStatus, record.completedAt
     ).run();
     if (!result.success) throw new Error("The focus block could not be saved.");
     return record;
@@ -52,7 +57,11 @@ export class D1FocusBlockStore implements FocusBlockStore {
         'sourceExternalId', source_external_id, 'estimatedMinutes', estimated_minutes,
         'selectedMinutes', selected_minutes, 'elapsedSeconds', elapsed_seconds,
         'completedChunkIds', json(completed_chunk_ids_json),
-        'completedChunkCount', completed_chunk_count, 'completedAt', completed_at
+        'completedChunkCount', completed_chunk_count,
+        'plannedChunkCount', COALESCE(planned_chunk_count, completed_chunk_count),
+        'taskKind', COALESCE(task_kind, 'generic'),
+        'sourceStatus', COALESCE(source_status, 'School status not available'),
+        'completedAt', completed_at
       )), '[]') AS records_json FROM (
         SELECT * FROM focus_blocks WHERE student_id = ? ORDER BY completed_at DESC LIMIT 50
       )`

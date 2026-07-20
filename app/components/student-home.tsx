@@ -12,10 +12,12 @@ import type {
   StudentSourceProjection
 } from "../../lib/domain/student-source-projection";
 import { StudentDailyCheckIn } from "./student-daily-check-in";
+import { StudentActivityHistory } from "./student-activity-history";
 import { StudentFamilyAssist } from "./student-family-assist";
 import { StudentPlanningBoardView } from "./student-planning-board";
 import { StudentTaskRoom, type StudentTaskRoomResult } from "./student-task-room";
 import styles from "./student-home.module.css";
+import type { FocusBlockRecord } from "../../lib/storage/focus-block-store";
 
 const LearningWorkspace = dynamic(
   () => import("./learning-workspace").then((module) => module.LearningWorkspace),
@@ -60,6 +62,23 @@ function errorMessage(value: unknown): string {
   return typeof error.message === "string" ? error.message : "Homeroom could not start yet.";
 }
 
+function dateInTimeZone(value: string, timeZone: string): string | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date(value));
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+    return year && month && day ? `${year}-${month}-${day}` : null;
+  } catch {
+    return null;
+  }
+}
+
 export function StudentHome({ student }: { student: Student }) {
   const [view, setView] = useState<StudentView>("today");
   const [status, setStatus] = useState<"starting" | "active" | "error">("starting");
@@ -74,6 +93,8 @@ export function StudentHome({ student }: { student: Student }) {
   const [error, setError] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<ProjectedPriority | null>(null);
   const [completedPriorityIds, setCompletedPriorityIds] = useState<string[]>([]);
+  const [focusBlocks, setFocusBlocks] = useState<FocusBlockRecord[]>([]);
+  const [resumeFocusBlock, setResumeFocusBlock] = useState<FocusBlockRecord | null>(null);
   const [reentry, setReentry] = useState<{ active: boolean; title: string; message: string; missedDayCount: number } | null>(null);
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [learningCourseId, setLearningCourseId] = useState<CourseId | null>(null);
@@ -137,11 +158,18 @@ export function StudentHome({ student }: { student: Student }) {
     }).then(async (response) => {
       const data = await response.json();
       if (!response.ok) return;
-      setCompletedPriorityIds((data.focusBlocks ?? []).map((item: { taskId: string }) => item.taskId));
+      const records = (data.focusBlocks ?? []) as FocusBlockRecord[];
+      setFocusBlocks(records);
+      setCompletedPriorityIds(records
+        .filter((item) => dateInTimeZone(
+          item.completedAt,
+          projection?.context.timeZone ?? "America/Chicago"
+        ) === projection?.context.localDate)
+        .map((item) => item.taskId));
       setReentry(data.reentry ?? null);
     }).catch(() => undefined);
     return () => controller.abort();
-  }, [csrfToken, status]);
+  }, [csrfToken, projection?.context.localDate, projection?.context.timeZone, status]);
 
   useEffect(() => {
     if (!plannerOpen) return;
@@ -171,10 +199,15 @@ export function StudentHome({ student }: { student: Student }) {
     setView("learn");
   }
 
+  function openTask(priority: ProjectedPriority, resumeSession: FocusBlockRecord | null = null) {
+    setResumeFocusBlock(resumeSession);
+    setSelectedPriority(priority);
+  }
+
   function handleCheckInAction(action: StudentCheckInAction) {
     if (action.kind === "task") {
       const priority = projection?.priorities.find((candidate) => candidate.id === action.priorityId);
-      if (priority) setSelectedPriority(priority);
+      if (priority) openTask(priority);
       return;
     }
     if (action.kind === "calendar") {
@@ -193,7 +226,6 @@ export function StudentHome({ student }: { student: Student }) {
   }
 
   async function finishTask(result: StudentTaskRoomResult) {
-    setCompletedPriorityIds((current) => current.includes(result.priorityId) ? current : [...current, result.priorityId]);
     try {
       const response = await fetch("/api/focus-blocks", {
         method: "POST",
@@ -208,6 +240,10 @@ export function StudentHome({ student }: { student: Student }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error?.message ?? "Your focus could not be saved yet.");
+      if (data.focusBlock) {
+        setFocusBlocks((current) => [data.focusBlock as FocusBlockRecord, ...current]);
+      }
+      setCompletedPriorityIds((current) => current.includes(result.priorityId) ? current : [...current, result.priorityId]);
       setReentry(data.reentry ?? null);
     } catch (caught) {
       setProjectionError(caught instanceof Error ? caught.message : "Your focus could not be saved yet.");
@@ -238,7 +274,7 @@ export function StudentHome({ student }: { student: Student }) {
         <Link className={styles.identity} href="/" aria-label="Switch Homeroom profile"><span>E</span><div><strong>{student.name}</strong><small>Grade {student.grade} · switch</small></div></Link>
       </header>
 
-      <section className={styles.workspace}>
+      <section className={`${styles.workspace} ${view === "today" && status === "active" ? styles.todayWorkspaceShell : ""}`}>
           {status === "starting" && (
             <section className={styles.todayLifecycle} aria-live="polite" aria-labelledby="student-today-loading-title">
               <span className={styles.lifecyclePulse} aria-hidden="true">✦</span>
@@ -270,25 +306,36 @@ export function StudentHome({ student }: { student: Student }) {
                 projection={projection}
                 csrfToken={csrfToken}
                 onAction={handleCheckInAction}
+                primaryContent={(
+                  <div className={styles.todayPrimaryColumn}>
+                    <StudentPlanningBoardView
+                      projection={projection}
+                      view="today"
+                      presentation="workspace"
+                      onOpenTask={(priority) => openTask(priority)}
+                      onOpenPlanner={() => setPlannerOpen(true)}
+                      completedPriorityIds={completedPriorityIds}
+                    />
+                    <StudentFamilyAssist csrfToken={csrfToken} candidate={projection.guardianAssistCandidates?.[0] ?? null} />
+                  </div>
+                )}
               />
-              <StudentPlanningBoardView
+              <StudentActivityHistory
+                focusBlocks={focusBlocks}
                 projection={projection}
-                view="today"
-                onOpenTask={setSelectedPriority}
-                onOpenPlanner={() => setPlannerOpen(true)}
-                completedPriorityIds={completedPriorityIds}
+                onResume={(priority, session) => openTask(priority, session)}
+                onRestart={(priority) => openTask(priority)}
               />
-              <StudentFamilyAssist csrfToken={csrfToken} candidate={projection.guardianAssistCandidates?.[0] ?? null} />
             </div>
           )}
           {projection && view === "calendar" && (
             <div id="student-panel-calendar" role="tabpanel" aria-labelledby="student-tab-calendar">
-              <StudentCalendar projection={projection} onOpenTask={setSelectedPriority} />
+              <StudentCalendar projection={projection} onOpenTask={(priority) => openTask(priority)} />
             </div>
           )}
           {projection && view === "classes" && (
             <div id="student-panel-classes" role="tabpanel" aria-labelledby="student-tab-classes">
-              <StudentClasses projection={projection} onOpenLearning={openLearningRoom} onOpenTask={setSelectedPriority} />
+              <StudentClasses projection={projection} onOpenLearning={openLearningRoom} onOpenTask={(priority) => openTask(priority)} />
             </div>
           )}
           {projection && view === "supplies" && (
@@ -309,9 +356,11 @@ export function StudentHome({ student }: { student: Student }) {
         <StudentTaskRoom
           key={selectedPriority.id}
           priority={selectedPriority}
-          onClose={() => setSelectedPriority(null)}
+          onClose={() => { setSelectedPriority(null); setResumeFocusBlock(null); }}
           onFinish={(result) => void finishTask(result)}
           onOpenLearning={openLearningRoom}
+          previousSessions={focusBlocks.filter((item) => item.taskId === selectedPriority.id)}
+          resumeSession={resumeFocusBlock}
         />
       )}
 

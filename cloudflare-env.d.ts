@@ -13,5 +13,8 @@ declare module "cloudflare:workers" {
     RESEND_API_KEY?: string;
     GUARDIAN_DIGEST_FROM?: string;
     CRON_SECRET?: string;
+    JUDGE_ACCESS_CODE?: string;
+    HOMEROOM_RELEASE_SHA?: string;
+    CF_VERSION_METADATA?: { id: string; tag?: string; timestamp?: string };
   };
 }

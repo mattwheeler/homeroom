@@ -85,23 +85,23 @@ export function StudentFamilyAssist({
 
   return (
     <details className={styles.assist}>
-      <summary><span aria-hidden="true">◇</span><strong>Something Matt may need to handle</strong><small>Homeroom noticed a guardian-only step. You decide whether to ask.</small></summary>
+      <summary><span aria-hidden="true">◇</span><strong>Something Matt may need to handle</strong><small>Preview the message before sending it.</small></summary>
       <div className={styles.body}>
         {status === "sent" && sent ? (
           <div className={styles.sent}><span aria-hidden="true">✓</span><div><strong>Delivered to Matt’s Homeroom inbox</strong><small>Only the approved request was sent.</small></div></div>
         ) : preview ? (
           <>
-            <p className={styles.label}>EXACT MESSAGE PREVIEW · NOT SENT YET</p>
+            <p className={styles.label}>MESSAGE PREVIEW · NOT SENT</p>
             <h3>{preview.preview.title}</h3>
             <p>{preview.preview.message}</p>
             <div className={styles.boundary}><span>To: {preview.preview.recipient.name}</span><span>Private schoolwork stays with Emily</span></div>
-            <button type="button" onClick={send} disabled={status === "sending"}>{status === "sending" ? "Sending approved message…" : "Approve and notify Matt"}</button>
+            <button type="button" onClick={send} disabled={status === "sending"}>{status === "sending" ? "Sending message…" : "Send to Matt"}</button>
           </>
         ) : (
           <>
-            <p className={styles.label}>POSSIBLE GUARDIAN STEP · YOU DECIDE</p>
+            <p className={styles.label}>MAY NEED A PARENT</p>
             <h3>{candidate.title}</h3>
-            <p>{candidate.reason} Homeroom can prepare a short reminder without sharing answers, drafts, attempts, or private coaching.</p>
+            <p>{candidate.reason} Your schoolwork stays private.</p>
             <button type="button" onClick={prepare} disabled={status === "previewing"}>{status === "previewing" ? "Preparing exact message…" : "Ask Matt about this"}</button>
           </>
         )}

@@ -144,7 +144,7 @@ export function StudentCalendar({
     <section className={styles.calendar} aria-labelledby="student-calendar-title">
       <header className={styles.intro}>
         <div>
-          <p>CALENDAR · ONE DAY AT A TIME</p>
+          <p>CALENDAR</p>
           <h2 id="student-calendar-title">See the month. Focus on one date.</h2>
           <span>Dots show how full a day is. Choose a date to see only that day’s details.</span>
         </div>
@@ -155,7 +155,7 @@ export function StudentCalendar({
         <aside className={styles.assistNudge} aria-label="Guardian assist candidate">
           <span aria-hidden="true">◇</span>
           <div>
-            <small>Guardian assist · source-backed</small>
+            <small>May need a parent</small>
             <strong>{guardianAssist.title}</strong>
             <p>{guardianAssist.reason}</p>
           </div>

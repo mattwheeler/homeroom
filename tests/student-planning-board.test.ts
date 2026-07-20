@@ -101,7 +101,7 @@ describe("visual live-source planning board", () => {
     expect(html).toContain("Open directions");
     expect(html).toContain("Start this assignment");
     expect(html).toContain("Build today’s live plan");
-    expect(html).toContain("You only need to choose this one step");
+    expect(html).toContain("Here’s the next useful step");
     expect((html.match(/data-next-item=/g) ?? [])).toHaveLength(2);
     expect(html).not.toContain("Guardian");
   });
@@ -112,5 +112,36 @@ describe("visual live-source planning board", () => {
     expect(html).toContain("Your week at a glance");
     expect(html).toContain("Mon, Aug 17");
     expect(html).not.toContain("Start here");
+  });
+
+  it("uses a compact workspace presentation without duplicating later steps", () => {
+    const projectionWithAlternative: StudentSourceProjection = {
+      ...projection,
+      priorities: [
+        ...projection.priorities,
+        {
+          ...projection.priorities[0],
+          id: "google_classroom:coursework:work_english",
+          rank: 2,
+          title: "Summer Reading Reflection"
+        }
+      ]
+    };
+    const html = renderToStaticMarkup(createElement(StudentPlanningBoardView, {
+      projection: projectionWithAlternative,
+      view: "today",
+      presentation: "workspace",
+      onOpenTask: () => undefined,
+      onOpenPlanner: () => undefined
+    }));
+
+    expect(html).not.toContain("One thing at a time");
+    expect(html).not.toContain("Here’s the next useful step");
+    expect(html).toContain("Start this assignment");
+    expect(html).toContain("Build today’s live plan");
+    expect(html).toContain("Show me another option");
+    expect(html).not.toContain("Then, if you want");
+    expect(html).not.toContain("data-next-item=");
+    expect(html).not.toContain("Want help fitting today together?");
   });
 });

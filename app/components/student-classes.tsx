@@ -207,7 +207,7 @@ export function StudentClasses({
           );
         })}
       </div>
-      <p className={styles.organizationCue}><span aria-hidden="true">▦</span><strong>Organization skill:</strong> one class, one list, one next action.</p>
+      <p className={styles.organizationCue}><span aria-hidden="true">▦</span><strong>Tip:</strong> open one class at a time.</p>
     </section>
   );
 }

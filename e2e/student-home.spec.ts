@@ -7,6 +7,8 @@ projection.priorities[0] = {
   ...projection.priorities[0],
   id: "google_classroom:coursework:work_band",
   title: "Band Camp Packing Checklist",
+  directions: "Confirm your instrument, music binder, water bottle, sunscreen, hat, lunch, and athletic shoes are ready.",
+  sessionPlan: { kind: "checklist_preparation", maxSteps: 4 },
   course: {
     externalId: "google_band",
     name: "Concert Band - Period 6",
@@ -114,7 +116,25 @@ test("Emily can use the complete calm student journey", async ({ page }) => {
     }
     expect(body.action).toBe("complete");
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
-      focusBlock: { id: "focus_01", completedAt: "2026-08-16T13:00:00.000Z" },
+      focusBlock: {
+        id: "focus_01",
+        studentId: "student_emily",
+        sessionId: "session_e2e",
+        taskId: projection.priorities[0].id,
+        taskTitle: projection.priorities[0].title,
+        courseName: projection.priorities[0].course.name,
+        sourceProvider: "google_classroom",
+        sourceExternalId: projection.priorities[0].source.externalId,
+        estimatedMinutes: 20,
+        selectedMinutes: body.selectedMinutes,
+        elapsedSeconds: body.elapsedSeconds,
+        completedChunkIds: body.completedChunkIds,
+        completedChunkCount: body.completedChunkIds.length,
+        plannedChunkCount: 4,
+        taskKind: "checklist_preparation",
+        sourceStatus: "Not submitted",
+        completedAt: "2026-08-17T15:00:00.000Z"
+      },
       reentry: { active: false, title: "", message: "", missedDayCount: 0 }
     }) });
   });
@@ -155,11 +175,32 @@ test("Emily can use the complete calm student journey", async ({ page }) => {
       })
     });
   });
+  await page.setViewportSize({ width: 1600, height: 1200 });
   await page.goto("/student");
 
   await expect(page.getByRole("tab", { name: "Today" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening), Emily\./ })).toBeVisible();
-  await expect(page.getByText("No guessed deadlines or events")).toBeVisible();
+  await expect(page.getByText("Assignments and dates checked")).toBeVisible();
+  const unifiedWorkspace = page.getByTestId("today-unified-workspace");
+  const workspaceBox = await unifiedWorkspace.boundingBox();
+  expect(workspaceBox?.width).toBeGreaterThan(1000);
+  const coachingBox = await page.getByTestId("today-coaching-panel").boundingBox();
+  const primaryBox = await page.getByTestId("today-primary-column").boundingBox();
+  expect(coachingBox).not.toBeNull();
+  expect(primaryBox).not.toBeNull();
+  expect(coachingBox!.y + coachingBox!.height).toBeLessThan(primaryBox!.y);
+  expect(primaryBox!.y + primaryBox!.height).toBeLessThanOrEqual(1200);
+  await expect(page.getByRole("button", { name: "Something else…" })).toBeVisible();
+  await expect(page.getByLabel("What would you like help with right now?")).toBeHidden();
+  for (const region of [page.getByTestId("today-primary-column"), page.getByTestId("today-coaching-panel")]) {
+    const dimensions = await region.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      overflowY: getComputedStyle(element).overflowY
+    }));
+    expect(dimensions.overflowY).not.toMatch(/auto|scroll/);
+    expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.clientHeight + 1);
+  }
   await page.getByRole("button", { name: "Low energy" }).click();
   await expect(page.getByLabel("What would you like help with right now?")).toHaveValue("I have low energy today, and it is affecting my ability to focus.");
   await page.getByRole("button", { name: "Low energy" }).click();
@@ -172,26 +213,37 @@ test("Emily can use the complete calm student journey", async ({ page }) => {
   await page.getByRole("button", { name: "Talk to Homeroom" }).click();
   await expect(page.getByText("Good choice. Put the instrument by the door; that is enough for this step.")).toBeVisible();
   await expect(page.getByText("Want to choose the next tiny item together?")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /One thing at a time|You’re caught up/ })).toBeVisible();
-  await expect(page.getByText("You do not need to hold the whole day in your head.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Band Camp Packing Checklist" })).toBeVisible();
 
   await page.getByRole("button", { name: "Start this assignment" }).click();
   await expect(page.getByRole("dialog", { name: "Band Camp Packing Checklist" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Your 3-step checklist" })).toBeVisible();
-  await expect(page.getByText("Homeroom never submits or changes this assignment.")).toBeVisible();
   const taskRoom = page.getByRole("dialog", { name: "Band Camp Packing Checklist" });
-  await page.setViewportSize({ width: 1180, height: 900 });
+  await expect(page.getByRole("heading", { name: "Check the list" })).toBeVisible();
+  await expect(page.getByText("My private work", { exact: true })).toBeVisible();
+  const plan = taskRoom.locator("details").filter({ hasText: "See the full plan" });
+  await page.getByText("See the full plan", { exact: true }).click();
+  await expect(plan).toHaveAttribute("open", "");
+  await expect(plan.getByText("Check the list", { exact: true })).toBeVisible();
+  await page.getByText("Assignment details", { exact: true }).click();
+  await expect(page.getByText("Homeroom never submits or changes this assignment.")).toBeVisible();
+  await page.setViewportSize({ width: 1400, height: 900 });
   const railBox = await taskRoom.getByTestId("task-room-focus-rail").boundingBox();
   const workBox = await taskRoom.getByTestId("task-room-work-area").boundingBox();
   expect(railBox).not.toBeNull();
   expect(workBox).not.toBeNull();
-  expect(railBox!.y + railBox!.height).toBeLessThanOrEqual(workBox!.y + 1);
-  await expect(taskRoom.getByRole("checkbox")).toHaveCount(3);
-  for (const checkbox of await taskRoom.getByRole("checkbox").all()) await checkbox.check();
-  await taskRoom.getByRole("button", { name: "Finish focus block" }).click();
-  await expect(taskRoom.getByText("FOCUS BLOCK COMPLETE", { exact: true })).toBeVisible();
+  expect(railBox!.x).toBeGreaterThan(workBox!.x + workBox!.width);
+  await expect(plan.getByRole("checkbox")).toHaveCount(4);
+  for (const checkbox of await plan.getByRole("checkbox").all()) await checkbox.check();
+  await taskRoom.getByRole("button", { name: "Save finished session" }).click();
+  await expect(taskRoom.getByText("FOCUS SESSION SAVED", { exact: true })).toBeVisible();
+  await expect(taskRoom.getByText(/does not mark the assignment complete/)).toBeVisible();
   await taskRoom.getByRole("button", { name: "Return to Today" }).click();
   await expect(page.getByText(/Focus block saved in Homeroom/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your last focus session" })).toBeVisible();
+  const recentWork = page.getByRole("region", { name: "Your last focus session" });
+  await expect(recentWork.getByText("Band Camp Packing Checklist")).toBeVisible();
+  await expect(recentWork.getByText(/4 of 4 steps/)).toBeVisible();
+  await expect(recentWork.getByRole("button", { name: "Work on it again" })).toBeVisible();
 
   await page.getByRole("tab", { name: "Calendar" }).click();
   await expect(page.getByRole("heading", { name: "See the month. Focus on one date." })).toBeVisible();
@@ -207,7 +259,7 @@ test("Emily can use the complete calm student journey", async ({ page }) => {
   await page.getByRole("tab", { name: "Supplies" }).click();
   await expect(page.getByRole("heading", { name: "Know what you need. Check what you have." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Algebra I Supply List" })).toBeVisible();
-  await expect(page.getByText("Homeroom did not add or guess any item.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Every line below comes from a page your guardian connected.", { exact: true })).toBeVisible();
 
   await page.getByRole("tab", { name: "Learn" }).click();
   await expect(page.getByRole("heading", { name: "Pick one short practice room" })).toBeVisible();

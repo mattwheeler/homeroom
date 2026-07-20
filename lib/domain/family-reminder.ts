@@ -81,7 +81,7 @@ export async function stageFamilyReminder(input: {
       label: `${input.candidate.courseName} · Google Classroom`
     },
     title: `${input.candidate.title} may need your help`,
-    message: `${emilyFixture.name} found a source-backed ${input.candidate.courseName} item that may need a parent or guardian: ${input.candidate.title}.${duePhrase(input.candidate)}`,
+    message: `${emilyFixture.name} asked for help with ${input.candidate.title} in ${input.candidate.courseName}.${duePhrase(input.candidate)}`,
     createdAt: now.toISOString()
   });
   const expectedPlanVersion = input.session.state.activePlanVersion ?? 0;

@@ -19,7 +19,7 @@ export function digestDeliveryConfirmation(delivery: DigestDelivery) {
   return {
     title: delivery.kind === "success" ? "Email digest sent" : "Email digest not sent",
     detail: delivery.kind === "success"
-      ? "The provider accepted this student-approved family digest for delivery."
+      ? "The email was accepted for delivery."
       : delivery.error || "The email provider did not accept this digest.",
     recipient,
     occurredAt: delivery.occurredAt
@@ -104,7 +104,7 @@ export function GuardianInbox({ csrfToken }: { csrfToken: string }) {
       const data = await call({ action: "digest" });
       setDigest(data.text ?? "");
       if (typeof data.recipientEmail === "string") setRecipientEmail(data.recipientEmail);
-      setMessage("This is exactly what the weekly email contains—only notes Emily chose to send.");
+      setMessage("This preview includes only notes Emily chose to send.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to build the digest.");
     } finally {
@@ -142,15 +142,15 @@ export function GuardianInbox({ csrfToken }: { csrfToken: string }) {
         <div><p>FAMILY INBOX</p><h2 id="guardian-inbox-title">Notes Emily chose to send</h2></div>
         <div>
           <button type="button" disabled={isLoading || busyAction !== null} onClick={() => void previewDigest()}>{busyAction === "preview" ? "Building preview…" : "Preview weekly email"}</button>{" "}
-          <button type="button" disabled={isLoading || busyAction !== null} onClick={() => void sendDigest()}>{busyAction === "send" ? "Sending email…" : "Email digest now"}</button>
+          <button type="button" disabled={isLoading || busyAction !== null} onClick={() => void sendDigest()}>{busyAction === "send" ? "Sending email…" : "Send weekly email now"}</button>
         </div>
       </header>
       <p className={styles.summary}>{isLoading ? "Loading family notes…" : unread === 0 ? "No unread notes." : `${unread} note${unread === 1 ? "" : "s"} waiting for you.`} {!isLoading && "Private coaching and answers are never included."}</p>
       <div className={styles.list}>
-        {notifications.length === 0 && <p>No family notes yet. When Emily asks for help, the exact preview she approves will appear here.</p>}
+        {notifications.length === 0 && <p>No family notes yet. Messages Emily sends will appear here.</p>}
         {notifications.map((item) => <article className={`${styles.card} ${item.readAt ? styles.read : ""}`} key={item.id}>
           <div><h3>{item.title}</h3><p>{item.message}</p><small>{item.sourceLabel} · {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(item.sentAt))}</small></div>
-          {!item.readAt && <button type="button" onClick={() => void acknowledge(item.id)}>Acknowledge</button>}
+          {!item.readAt && <button type="button" onClick={() => void acknowledge(item.id)}>Mark as read</button>}
         </article>)}
       </div>
       {digest && <div className={styles.digest}>{digest}</div>}

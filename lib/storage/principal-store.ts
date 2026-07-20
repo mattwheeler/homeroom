@@ -20,10 +20,50 @@ export interface HouseholdBootstrap {
   householdName?: string;
 }
 
-async function stableId(prefix: string, value: string): Promise<string> {
+export async function stableId(prefix: string, value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value.trim().toLowerCase()));
   const suffix = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("").slice(0, 24);
   return `${prefix}_${suffix}`;
+}
+
+export async function householdPrincipalIds(bootstrap: HouseholdBootstrap): Promise<{
+  householdId: string;
+  guardianId: string;
+  studentId: string;
+}> {
+  const guardianEmail = bootstrap.guardianEmail.trim().toLowerCase();
+  const studentEmail = bootstrap.studentEmail.trim().toLowerCase();
+  const [householdId, guardianId, studentId] = await Promise.all([
+    stableId("household", `${guardianEmail}|${studentEmail}`),
+    stableId("principal", `guardian|${guardianEmail}`),
+    stableId("principal", `student|${studentEmail}`)
+  ]);
+  return { householdId, guardianId, studentId };
+}
+
+/**
+ * Resolves the seeded Build Week household without changing its verified
+ * Google identity records. Judge access is deliberately read as the existing
+ * fictional household instead of becoming a second source of identity truth.
+ */
+export class D1ExistingHouseholdPrincipalResolver implements PrincipalResolver {
+  constructor(private readonly bootstrap: HouseholdBootstrap) {}
+
+  async resolve(identity: VerifiedIdentity): Promise<ResolvedPrincipal> {
+    const guardianEmail = this.bootstrap.guardianEmail.trim().toLowerCase();
+    const studentEmail = this.bootstrap.studentEmail.trim().toLowerCase();
+    const expectedEmail = identity.role === "guardian" ? guardianEmail : studentEmail;
+    if (identity.email.trim().toLowerCase() !== expectedEmail) {
+      throw new Error("This identity is not linked to the configured household.");
+    }
+    const { householdId, guardianId, studentId } = await householdPrincipalIds(this.bootstrap);
+    return {
+      principalId: identity.role === "guardian" ? guardianId : studentId,
+      householdId,
+      studentId,
+      guardianId
+    };
+  }
 }
 
 export class D1PrincipalStore implements PrincipalResolver {
@@ -39,11 +79,7 @@ export class D1PrincipalStore implements PrincipalResolver {
     const expectedEmail = identity.role === "guardian" ? guardianEmail : studentEmail;
     if (identityEmail !== expectedEmail) throw new Error("This identity is not linked to the configured household.");
 
-    const [householdId, guardianId, studentId] = await Promise.all([
-      stableId("household", `${guardianEmail}|${studentEmail}`),
-      stableId("principal", `guardian|${guardianEmail}`),
-      stableId("principal", `student|${studentEmail}`)
-    ]);
+    const { householdId, guardianId, studentId } = await householdPrincipalIds(this.bootstrap);
     const now = new Date().toISOString();
     const actorId = identity.role === "guardian" ? guardianId : studentId;
     const otherId = identity.role === "guardian" ? studentId : guardianId;

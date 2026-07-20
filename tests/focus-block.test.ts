@@ -23,7 +23,10 @@ describe("persistent focus blocks and shame-free re-entry", () => {
         sourceProvider: "google_classroom",
         sourceExternalId: "packing",
         estimatedMinutes: 20,
-        validChunkIds: ["packing:setup", "packing:focus", "packing:finish"]
+        validChunkIds: ["packing:setup", "packing:focus", "packing:finish"],
+        plannedChunkCount: 3,
+        taskKind: "checklist_preparation",
+        sourceStatus: "Not submitted"
       },
       selectedMinutes: 15,
       elapsedSeconds: 712,
@@ -31,7 +34,16 @@ describe("persistent focus blocks and shame-free re-entry", () => {
       now: () => new Date("2026-07-19T16:00:00.000Z"),
       randomUUID: () => "focus_01"
     });
-    expect(result).toMatchObject({ id: "focus_01", estimatedMinutes: 20, selectedMinutes: 15, elapsedSeconds: 712, completedChunkCount: 3 });
+    expect(result).toMatchObject({
+      id: "focus_01",
+      estimatedMinutes: 20,
+      selectedMinutes: 15,
+      elapsedSeconds: 712,
+      completedChunkCount: 3,
+      plannedChunkCount: 3,
+      taskKind: "checklist_preparation",
+      sourceStatus: "Not submitted"
+    });
   });
 
   it("offers a non-judgmental return after two quiet days", () => {
@@ -57,7 +69,11 @@ describe("persistent focus blocks and shame-free re-entry", () => {
     })).toMatchObject({ active: false, missedDayCount: 0 });
     await expect(completeFocusBlock({
       store: new MemoryFocusBlocks(), studentId: "s", sessionId: "x",
-      task: { id: "t", title: "Task", courseName: "Class", sourceProvider: "source", sourceExternalId: "e", estimatedMinutes: 0, validChunkIds: ["valid"] },
+      task: {
+        id: "t", title: "Task", courseName: "Class", sourceProvider: "source",
+        sourceExternalId: "e", estimatedMinutes: 0, validChunkIds: ["valid"],
+        plannedChunkCount: 1, taskKind: "generic", sourceStatus: "Not submitted"
+      },
       selectedMinutes: 99, elapsedSeconds: -2, completedChunkIds: ["invalid"]
     })).rejects.toThrow(/visible chunk/);
   });

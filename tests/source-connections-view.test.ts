@@ -11,8 +11,8 @@ describe("student source projection", () => {
       onCoursesChanged: vi.fn()
     }));
 
-    expect(markup).toContain("Guardian-managed school sources");
-    expect(markup).toContain("Matt controls connections");
+    expect(markup).toContain("Connected school information");
+    expect(markup).toContain("Your guardian controls");
     expect(markup).not.toContain("Connect Google Classroom");
     expect(markup).not.toContain("Private BAND calendar URL");
     expect(markup).not.toContain("Refresh Classroom");

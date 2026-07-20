@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage",
     "security": "npm audit --audit-level=high",
-    "verify": "npm run typecheck && npm run lint && npm run test:coverage && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm run test:coverage && npm run build",
+    "verify:release": "npm run security && npm run verify && npm run test:e2e"
   },
   "dependencies": {
     "ical.js": "^2.2.1",
@@ -30,6 +31,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@cloudflare/vite-plugin": "1.45.1",
     "@playwright/test": "^1.61.1",
     "@types/node": "22.19.19",

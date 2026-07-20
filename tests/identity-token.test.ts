@@ -65,4 +65,12 @@ describe("role-bound identity token validation", () => {
       await expect(verifyIdentityToken(token, secret, 0)).rejects.toMatchObject({ code: "INVALID_IDENTITY" });
     }
   });
+
+  it("accepts the explicitly supported short-lived judge provider", async () => {
+    const token = await signIdentityToken({ ...validIdentity, provider: "judge" }, secret, 100);
+    await expect(verifyIdentityToken(token, secret, 99)).resolves.toEqual({
+      ...validIdentity,
+      provider: "judge"
+    });
+  });
 });

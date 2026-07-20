@@ -2,6 +2,7 @@ import type { GuardianSourceSummary } from "../../lib/domain/guardian-setup-prof
 
 export const guardianNavigationItems = [
   { id: "guardian-inbox", href: "#guardian-inbox", label: "Inbox", detail: "Student-approved notes", marker: "I" },
+  { id: "student-progress", href: "#student-progress", label: "Progress", detail: "Tasks and focus sessions", marker: "P" },
   { id: "household", href: "#household", label: "Household & student", detail: "People, age, and grade", marker: "H" },
   { id: "learning-support", href: "#learning-support", label: "Learning", detail: "Skills and visual support", marker: "L" },
   { id: "safety-privacy", href: "#safety-privacy", label: "Safety", detail: "Boundaries and privacy", marker: "S" },

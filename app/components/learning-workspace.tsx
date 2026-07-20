@@ -397,19 +397,19 @@ export function LearningWorkspace({
     <section className="learning-workspace card" id="learning" aria-labelledby="learning-title">
       <header className="learning-header">
         <div>
-          <p className="eyebrow">{gradeReadinessMode ? `GRADE ${grade} SUMMER READINESS` : "LEARN · Recommended first"}</p>
+          <p className="eyebrow">{gradeReadinessMode ? `GRADE ${grade} READINESS` : "LEARN"}</p>
           <h2 id="learning-title">{gradeReadinessMode ? "Choose a short summer practice" : "Pick one short practice room"}</h2>
           <p>{gradeReadinessMode
             ? `Your school classes aren’t synced yet. These are Homeroom-created Grade ${grade} readiness rooms—not teacher assignments.`
             : "Three useful choices are shown first. Every connected class is still available when you want it."}</p>
         </div>
-        <span className="learning-trust">Private by default · no grades</span>
+        <span className="learning-trust">Private practice · no grades</span>
       </header>
 
       <div className="learning-taxonomy" aria-label="How Learning rooms are created">
-        <span><i aria-hidden="true">G</i><strong>From school</strong><small>Shown only when class names or due-work signals come from a connected source.</small></span>
-        <span><i aria-hidden="true">◇</i><strong>Readiness practice</strong><small>Homeroom-created coaching—not a teacher assignment or grade.</small></span>
-        <span><i aria-hidden="true">◷</i><strong>Life skills</strong><small>Time management, organization, and prioritization are built in.</small></span>
+        <span><i aria-hidden="true">G</i><strong>From school</strong><small>Uses a connected class or upcoming assignment.</small></span>
+        <span><i aria-hidden="true">◇</i><strong>Readiness practice</strong><small>Created by Homeroom—not assigned or graded by school.</small></span>
+        <span><i aria-hidden="true">◷</i><strong>Life skills</strong><small>Includes planning, organization, and prioritization.</small></span>
       </div>
 
       <div className="learning-track-grid">
@@ -431,7 +431,7 @@ export function LearningWorkspace({
               </div>
               <strong>{track.mission.title}</strong>
               <em><b>Why this is here:</b> {recommendationReason(course)}</em>
-              <small>{track.mission.suggestedMinutes} min · Life skills built in</small>
+              <small>{track.mission.suggestedMinutes} min · Includes life skills</small>
             </button>
           );
         })}
@@ -457,12 +457,12 @@ export function LearningWorkspace({
                 <span aria-hidden="true">←</span> Back to classes
               </button>
               <div>
-                <span>Focused Learning Room</span>
+                <span>Practice room</span>
                 <strong>{selectedCourse.name}</strong>
               </div>
               <div className="learning-room-fit">
                 <strong>Grade {emilyStudentSupportProfile.grade}</strong>
-                <small>{studentSupportPolicy.visualFirst ? "Visual-first" : "Multi-modal"} · up to {studentSupportPolicy.maxDirectionsAtOnce} steps</small>
+                <small>{studentSupportPolicy.visualFirst ? "Visual guide" : "Multiple learning modes"} · {studentSupportPolicy.maxDirectionsAtOnce} steps at a time</small>
               </div>
             </header>
             <section className="learning-stage" aria-live="polite">
@@ -470,9 +470,9 @@ export function LearningWorkspace({
                 <div>
                   <span className="source-chip">Readiness practice · {selectedTrack.mission.source.label}</span>
                   <h3>{selectedTrack.trackTitle}</h3>
-                  <p>A guided workspace for planning, seeing, practicing, and explaining—not a one-question quiz.</p>
+                  <p>Practice one step at a time with Homeroom.</p>
                 </div>
-                <span className="learning-safety-note">Student thinking stays in the lead</span>
+                <span className="learning-safety-note">Your work stays yours</span>
               </header>
 
               <div className="learning-goal-row">
@@ -564,8 +564,8 @@ export function LearningWorkspace({
                   {(status === "active" || status === "sending" || status === "completing") && active && (
                     <section className="learning-live" aria-labelledby="learning-coach-title">
                       <div className="learning-live-proof">
-                        <span id="learning-coach-title"><i /> Live GPT-5.6 Sol coach</span>
-                        <small>App-owned context · OpenAI store: false</small>
+                        <span id="learning-coach-title"><i /> Homeroom coach</span>
+                        <small>Private practice</small>
                       </div>
                       {latestCoachTurn?.executiveSkill && (
                         <div className={`learning-executive-cue ${latestCoachTurn.executiveSkill}`}>
@@ -622,12 +622,12 @@ export function LearningWorkspace({
                     <div className="learning-complete">
                       <span className="learning-complete-mark">✓</span>
                       <div>
-                        <p className="eyebrow">SESSION SAVED · {completion.summary.objectiveStatus}</p>
+                        <p className="eyebrow">PRACTICE SAVED</p>
                         <h4>{completion.summary.missionTitle}</h4>
                         <p>{completion.summary.objective}</p>
-                        <small>{completion.summary.completedTurns} student turn{completion.summary.completedTurns === 1 ? "" : "s"} · Private Learning notes saved</small>
+                        <small>{completion.summary.completedTurns} response{completion.summary.completedTurns === 1 ? "" : "s"} · Your recap is saved</small>
                       </div>
-                      <div className="dialogue-deleted"><strong>Active dialogue deleted</strong><span>Only the recap and explicit preference remain.</span></div>
+                      <div className="dialogue-deleted"><strong>Conversation deleted</strong><span>Your recap and saved learning preference remain.</span></div>
                     </div>
                   )}
 
@@ -636,7 +636,7 @@ export function LearningWorkspace({
                   {visibleSignals.length > 0 && (
                     <aside className="learner-memory" aria-labelledby="learner-memory-title">
                       <div>
-                        <p className="eyebrow">VISIBLE · EDITABLE · COURSE-SCOPED</p>
+                        <p className="eyebrow">SAVED FOR THIS CLASS</p>
                         <h4 id="learner-memory-title">What Homeroom remembers</h4>
                       </div>
                       <div className="memory-list">

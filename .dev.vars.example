@@ -8,3 +8,4 @@ AUTH_STUDENT_EMAILS=student-google-account@example.com
 RESEND_API_KEY=replace-with-resend-api-key
 GUARDIAN_DIGEST_FROM=Homeroom <updates@your-verified-domain.example>
 CRON_SECRET=replace-with-another-random-secret-at-least-32-characters
+JUDGE_ACCESS_CODE=replace-with-a-private-random-review-code-at-least-24-characters

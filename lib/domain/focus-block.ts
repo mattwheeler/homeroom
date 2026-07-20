@@ -1,4 +1,5 @@
 import type { FocusBlockStore } from "../storage/focus-block-store";
+import type { TaskSessionKind } from "./task-session-plan";
 
 export async function completeFocusBlock(input: {
   store: FocusBlockStore;
@@ -12,6 +13,9 @@ export async function completeFocusBlock(input: {
     sourceExternalId: string;
     estimatedMinutes: number;
     validChunkIds: string[];
+    plannedChunkCount: number;
+    taskKind: TaskSessionKind;
+    sourceStatus: string;
   };
   selectedMinutes: number;
   elapsedSeconds: number;
@@ -36,6 +40,9 @@ export async function completeFocusBlock(input: {
     elapsedSeconds: Math.max(0, Math.min(4 * 60 * 60, Math.round(input.elapsedSeconds))),
     completedChunkIds,
     completedChunkCount: completedChunkIds.length,
+    plannedChunkCount: Math.max(completedChunkIds.length, Math.round(input.task.plannedChunkCount)),
+    taskKind: input.task.taskKind,
+    sourceStatus: input.task.sourceStatus,
     completedAt: (input.now ?? (() => new Date()))().toISOString()
   };
   return input.store.save(record);
