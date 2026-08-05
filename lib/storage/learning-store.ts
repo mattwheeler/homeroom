@@ -119,7 +119,12 @@ export class D1LearningStore implements LearningStore {
 
   async startSession(write: StartLearningWrite): Promise<void> {
     const learning = write.learningSession;
-    const result = await this.database.prepare(
+    const batch = requireBatch(this.database);
+    const clearAbandonedSession = this.database.prepare(
+      `DELETE FROM learning_sessions
+      WHERE demo_session_id = ? AND status = 'active'`
+    ).bind(learning.demoSessionId);
+    const insertSession = this.database.prepare(
       `INSERT INTO learning_sessions (
         id, demo_session_id, student_id, course_id, mission_id, objective_id,
         status, duration_minutes, support_preference, source_label,
@@ -147,8 +152,12 @@ export class D1LearningStore implements LearningStore {
       learning.demoSessionId,
       learning.studentId,
       "student"
-    ).run();
-    assertChange(result, "Unable to start the Learning session.");
+    );
+    const results = await batch([clearAbandonedSession, insertSession]);
+    if (!results[0]?.success) {
+      throw new LearningStoreError("Unable to replace the prior Learning session.");
+    }
+    assertChange(results[1] ?? { success: false }, "Unable to start the Learning session.");
   }
 
   async findSession(

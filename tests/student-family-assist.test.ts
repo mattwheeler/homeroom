@@ -20,12 +20,15 @@ const candidate = {
 };
 
 describe("student-controlled family help", () => {
-  it("keeps the action collapsed and promises an exact preview before sending", () => {
+  it("shows the source-backed parent action without hiding it behind a disclosure", () => {
     const html = renderToStaticMarkup(createElement(StudentFamilyAssist, { csrfToken: "csrf", candidate }));
 
     expect(html).toContain("Something Matt may need to handle");
     expect(html).toContain("Preview the message before sending it");
     expect(html).toContain("Ask Matt about this");
+    expect(html).toContain("Band physical form");
+    expect(html).toContain("<section");
+    expect(html).not.toContain("<details");
     expect(html).not.toContain("Approve and notify Matt");
   });
 

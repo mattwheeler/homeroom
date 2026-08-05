@@ -10,6 +10,7 @@ import {
 import type { RateLimiter } from "../security/rate-limit";
 import { SessionTokenError, verifySessionToken } from "../security/session-token";
 import type { SessionRecord, SessionStore } from "../storage/session-store";
+import type { Logger } from "../observability/logger";
 
 const emptySchema = z.object({}).strict();
 
@@ -19,6 +20,7 @@ export interface StudentProjectionDependencies {
   rateLimiter: RateLimiter;
   clientKey: string;
   now?: () => Date;
+  logger?: Logger;
   projection(session: SessionRecord, now: Date): Promise<unknown>;
 }
 
@@ -84,7 +86,8 @@ export async function handleStudentProjection(
     }
     try {
       return json(await dependencies.projection(session, now), 200);
-    } catch {
+    } catch (error) {
+      dependencies.logger?.error("student_projection_failed", error, { sessionId: session.id });
       return json(
         { error: { code: "PROJECTION_UNAVAILABLE", message: "Your live school plan could not be refreshed yet." } },
         502,
@@ -101,6 +104,7 @@ export async function handleStudentProjection(
     if (error instanceof z.ZodError) {
       return json({ error: { code: "INVALID_REQUEST", message: "Invalid projection request." } }, 400);
     }
+    dependencies.logger?.error("student_projection_request_failed", error, { clientKey: dependencies.clientKey });
     return json({ error: { code: "SERVICE_UNAVAILABLE", message: "Your live school plan is unavailable." } }, 500);
   }
 }

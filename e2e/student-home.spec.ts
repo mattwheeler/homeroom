@@ -101,10 +101,13 @@ test("Emily can use the complete calm student journey", async ({ page }) => {
       body: JSON.stringify({
         csrfToken: "csrf-student-e2e",
         profile: { name: "Emily", grade: 9 },
-        session: { reused: false, expiresAt: "2026-08-17T16:00:00.000Z" },
-        projection
+        session: { reused: false, expiresAt: "2026-08-17T16:00:00.000Z" }
       })
     });
+  });
+  await page.route("**/api/student/projection", async (route) => {
+    expect(route.request().headers()["x-homeroom-csrf"]).toBe("csrf-student-e2e");
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(projection) });
   });
   await page.route("**/api/focus-blocks", async (route) => {
     const body = route.request().postDataJSON();

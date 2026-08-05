@@ -18,6 +18,7 @@ import { StudentPlanningBoardView } from "./student-planning-board";
 import { StudentTaskRoom, type StudentTaskRoomResult } from "./student-task-room";
 import styles from "./student-home.module.css";
 import type { FocusBlockRecord } from "../../lib/storage/focus-block-store";
+import { ClientResponseError, readJsonResponse } from "../../lib/http/client-json";
 
 const LearningWorkspace = dynamic(
   () => import("./learning-workspace").then((module) => module.LearningWorkspace),
@@ -60,6 +61,38 @@ function errorMessage(value: unknown): string {
   const error = value.error;
   if (!error || typeof error !== "object" || !("message" in error)) return "Homeroom could not start yet.";
   return typeof error.message === "string" ? error.message : "Homeroom could not start yet.";
+}
+
+function retryableResponseError(response: Response, value: unknown, fallbackMessage: string): ClientResponseError {
+  return new ClientResponseError(
+    errorMessage(value) === "Homeroom could not start yet." ? fallbackMessage : errorMessage(value),
+    response.status,
+    response.headers.get("cf-ray"),
+    response.status === 429 || response.status >= 500
+  );
+}
+
+async function loadStudentProjection(csrfToken: string): Promise<StudentSourceProjection> {
+  const requestProjection = async () => {
+    const response = await fetch("/api/student/projection", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-homeroom-csrf": csrfToken },
+      body: "{}"
+    });
+    const data = await readJsonResponse<unknown>(response, "Your school day could not be refreshed yet.");
+    if (!response.ok || !data || typeof data !== "object" || !("today" in data)) {
+      throw retryableResponseError(response, data, "Your school day could not be refreshed yet.");
+    }
+    return data as StudentSourceProjection;
+  };
+
+  try {
+    return await requestProjection();
+  } catch (error) {
+    if (!(error instanceof ClientResponseError) || !error.retryable) throw error;
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    return requestProjection();
+  }
 }
 
 function dateInTimeZone(value: string, timeZone: string): string | null {
@@ -114,23 +147,17 @@ export function StudentHome({ student }: { student: Student }) {
           headers: { "content-type": "application/json" },
           body: "{}"
         });
-        const data = await response.json() as {
+        const data = await readJsonResponse<{
           csrfToken?: unknown;
-          projection?: unknown;
           error?: { message?: string };
-        };
-        if (
-          !response.ok ||
-          typeof data.csrfToken !== "string" ||
-          !data.projection ||
-          typeof data.projection !== "object" ||
-          !("today" in data.projection)
-        ) {
-          throw new Error(errorMessage(data));
+        }>(response, "Your Today page could not be opened yet.");
+        if (!response.ok || typeof data.csrfToken !== "string") {
+          throw retryableResponseError(response, data, "Your Today page could not be opened yet.");
         }
+        const projection = await loadStudentProjection(data.csrfToken);
         return {
           csrfToken: data.csrfToken,
-          projection: data.projection as StudentSourceProjection
+          projection
         };
       })();
     }
@@ -141,6 +168,9 @@ export function StudentHome({ student }: { student: Student }) {
       setStatus("active");
     }).catch((caught) => {
       if (cancelled) return;
+      if (caught instanceof ClientResponseError && caught.rayId) {
+        console.error("student_today_load_failed", { status: caught.status, rayId: caught.rayId });
+      }
       setStatus("error");
       setError(caught instanceof Error ? caught.message : "Your Today page could not be opened yet.");
     });

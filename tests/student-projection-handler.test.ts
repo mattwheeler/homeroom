@@ -129,17 +129,24 @@ describe("student source projection HTTP handler", () => {
   });
 
   it("does not expose projection or storage failures", async () => {
+    const logger = { error: vi.fn() };
     const response = await handleStudentProjection(await request(), {
       store: new MemorySessionStore(session()),
       signingSecret,
       rateLimiter: allow,
       clientKey: "test",
       now,
+      logger,
       projection: vi.fn().mockRejectedValue(new Error("D1 secret table internals"))
     });
 
     expect(response.status).toBe(502);
     expect(response.headers.get("retry-after")).toBe("5");
     expect(JSON.stringify(await response.json())).not.toContain("D1 secret table internals");
+    expect(logger.error).toHaveBeenCalledWith(
+      "student_projection_failed",
+      expect.any(Error),
+      { sessionId: "session_01" }
+    );
   });
 });

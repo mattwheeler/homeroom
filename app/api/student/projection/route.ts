@@ -4,9 +4,13 @@ import { emilyFixture } from "../../../../lib/domain/fixtures";
 import { projectStudentSources } from "../../../../lib/domain/student-source-projection";
 import { emilyStudentSupportProfile } from "../../../../lib/domain/student-support-profile";
 import { handleStudentProjection } from "../../../../lib/http/student-projection-handler";
+import { StructuredLogger } from "../../../../lib/observability/logger";
 import { D1FixedWindowRateLimiter } from "../../../../lib/security/rate-limit";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
-import { D1SourceConnectionStore } from "../../../../lib/storage/source-connection-store";
+import {
+  activeSourceEventWindow,
+  D1SourceConnectionStore
+} from "../../../../lib/storage/source-connection-store";
 import { D1SchoolSourceStore } from "../../../../lib/storage/school-source-store";
 import { D1StudentSafetyPolicyStore } from "../../../../lib/storage/student-safety-policy-store";
 
@@ -28,10 +32,11 @@ export async function POST(request: Request) {
     signingSecret: env.SESSION_SIGNING_SECRET,
     rateLimiter: limiter,
     clientKey: request.headers.get("cf-connecting-ip") ?? "local-preview",
+    logger: new StructuredLogger("student-projection"),
     projection: async (session, now) => {
       const studentId = session.studentId ?? session.actorId;
       const [snapshot, schoolSnapshot, externalLinkPolicy] = await Promise.all([
-        sources.getStudentSnapshot(studentId),
+        sources.getStudentSnapshot(studentId, activeSourceEventWindow(now)),
         schoolSources.getStudentSnapshot(studentId),
         safetyPolicies.findExternalLinkPolicy(studentId).catch(() => "blocked" as const)
       ]);

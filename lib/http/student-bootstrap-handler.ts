@@ -12,7 +12,7 @@ import {
 } from "../security/http";
 import type { RateLimiter } from "../security/rate-limit";
 import type { PrincipalResolver } from "../storage/principal-store";
-import type { ReusableSessionStore, SessionRecord } from "../storage/session-store";
+import type { ReusableSessionStore } from "../storage/session-store";
 
 const emptyRequest = z.object({}).strict();
 
@@ -27,7 +27,6 @@ export interface StudentBootstrapDependencies {
   now?: () => Date;
   randomUUID?: () => string;
   randomBytes?: () => Uint8Array;
-  projection(session: SessionRecord, now: Date): Promise<unknown>;
   logger?: Logger;
 }
 
@@ -98,27 +97,11 @@ export async function handleStudentBootstrap(
       dependencies.secureCookie
     );
 
-    let projection: unknown;
-    try {
-      projection = await dependencies.projection(established.session, now);
-    } catch (error) {
-      dependencies.logger?.error("student_bootstrap_projection_failed", error, {
-        clientKey: dependencies.clientKey,
-        reusedSession: established.reused
-      });
-      return json(
-        { error: { code: "PROJECTION_UNAVAILABLE", message: "Your live school day could not be refreshed yet." } },
-        502,
-        { "retry-after": "5", "set-cookie": cookie }
-      );
-    }
-
     return json(
       {
         csrfToken: established.csrfToken,
         profile: established.profile,
-        session: { reused: established.reused, expiresAt: established.session.expiresAt },
-        projection
+        session: { reused: established.reused, expiresAt: established.session.expiresAt }
       },
       200,
       { "set-cookie": cookie }

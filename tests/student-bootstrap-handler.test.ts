@@ -54,17 +54,12 @@ function dependencies(store = new MemoryStore()) {
     secureCookie: true,
     now: () => new Date("2026-08-17T14:00:00.000Z"),
     randomUUID: () => "student_session_01",
-    randomBytes: () => Buffer.from("bootstrap-csrf-token"),
-    projection: async (session: SessionRecord) => ({
-      generatedAt: "2026-08-17T14:00:00.000Z",
-      studentId: session.studentId,
-      priorities: [{ id: "live-work-01" }]
-    })
+    randomBytes: () => Buffer.from("bootstrap-csrf-token")
   };
 }
 
-describe("unified authenticated student bootstrap", () => {
-  it("issues a hardened product-session cookie, CSRF token, and live projection in one response", async () => {
+describe("authenticated student bootstrap", () => {
+  it("issues a hardened product-session cookie and CSRF token without loading school sources", async () => {
     const response = await handleStudentBootstrap(request(), dependencies());
     const body = await response.json() as Record<string, unknown>;
 
@@ -72,10 +67,10 @@ describe("unified authenticated student bootstrap", () => {
     expect(body).toMatchObject({
       csrfToken: expect.any(String),
       profile: { name: "Emily", grade: 9 },
-      session: { reused: false, expiresAt: "2026-08-17T16:00:00.000Z" },
-      projection: { studentId: "student_emily", priorities: [{ id: "live-work-01" }] }
+      session: { reused: false, expiresAt: "2026-08-17T16:00:00.000Z" }
     });
     expect(body).not.toHaveProperty("sessionToken");
+    expect(body).not.toHaveProperty("projection");
     expect(response.headers.get("set-cookie")).toContain("homeroom_session=");
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
     expect(response.headers.get("set-cookie")).toContain("SameSite=Strict");
@@ -115,14 +110,4 @@ describe("unified authenticated student bootstrap", () => {
     expect(store.records.size).toBe(0);
   });
 
-  it("returns a safe retryable response when live sources fail", async () => {
-    const response = await handleStudentBootstrap(request(), {
-      ...dependencies(),
-      projection: async () => { throw new Error("private upstream detail"); }
-    });
-
-    expect(response.status).toBe(502);
-    expect(response.headers.get("retry-after")).toBe("5");
-    expect(await response.text()).not.toContain("private upstream detail");
-  });
 });

@@ -1,10 +1,18 @@
-.assist { width: min(920px, 100%); margin: 18px auto 0; border: 1px solid #dce6e0; border-radius: 18px; background: white; box-shadow: 0 10px 30px rgba(31,68,54,.05); }
-.assist summary { display: grid; grid-template-columns: auto 1fr; gap: 3px 11px; padding: 16px 18px; color: #2e5546; cursor: pointer; list-style: none; }
-.assist summary::-webkit-details-marker { display: none; }
-.assist summary > span { grid-row: 1 / 3; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: white; background: #3d715d; }
-.assist summary strong { font-size: .92rem; }
-.assist summary small { color: #74837b; font-size: .78rem; }
-.body { padding: 2px 18px 18px 63px; border-top: 1px solid #e7ece9; }
+.assist { width: min(920px, 100%); margin: 18px auto 0; border: 1px solid #dce6e0; border-radius: 18px; background: #fffdf9; box-shadow: 0 10px 30px rgba(31,68,54,.05); }
+.compact { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 13px 16px; }
+.compactIcon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: white; background: #3d715d; }
+.compactCopy strong, .compactCopy small { display: block; }
+.compactCopy strong { color: #2e5546; font-size: .92rem; }
+.compactCopy small { margin-top: 3px; color: #74837b; font-size: .74rem; }
+.compactCopy small b { color: #49685a; }
+.compactAction { min-height: 41px; padding: 9px 13px; border: 0; border-radius: 11px; color: white; background: #285d49; font: inherit; font-size: .78rem; font-weight: 820; cursor: pointer; }
+.header { display: grid; grid-template-columns: auto 1fr; gap: 11px; padding: 16px 18px 12px; color: #2e5546; }
+.header > span { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: white; background: #3d715d; }
+.header strong, .header small { display: block; }
+.header strong { font-size: .96rem; }
+.header small { margin-top: 3px; color: #74837b; font-size: .78rem; }
+.eyebrow { margin: 0 0 3px; color: #d26750; font-size: .66rem; font-weight: 900; letter-spacing: .13em; }
+.body { padding: 0 18px 18px 67px; }
 .label { margin: 15px 0 6px; color: #d26750; font-size: .75rem; font-weight: 900; letter-spacing: .12em; }
 .body h3 { margin: 0; color: #213f33; font-family: Georgia, serif; font-size: 1.25rem; }
 .body > p:not(.label):not(.error) { max-width: 650px; color: #687970; font-size: .86rem; line-height: 1.55; }
@@ -18,4 +26,8 @@
 .sent strong { color: #2e5546; font-size: .8rem; }
 .sent small { margin-top: 3px; color: #73847b; font-size: .64rem; }
 .error { color: #a13f35; font-size: .7rem; }
-@media (max-width: 620px) { .body { padding-left: 18px; } }
+@media (max-width: 620px) {
+  .compact { grid-template-columns: auto 1fr; }
+  .compactAction { grid-column: 1 / -1; width: 100%; }
+  .body { padding: 0 18px 18px; }
+}

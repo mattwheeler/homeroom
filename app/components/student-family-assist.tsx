@@ -83,9 +83,30 @@ export function StudentFamilyAssist({
 
   if (!candidate) return null;
 
+  if (status === "idle") {
+    return (
+      <section className={`${styles.assist} ${styles.compact}`} aria-labelledby="family-assist-title">
+        <span className={styles.compactIcon} aria-hidden="true">◇</span>
+        <div className={styles.compactCopy}>
+          <p className={styles.eyebrow}>PARENT HELP</p>
+          <strong id="family-assist-title">Something Matt may need to handle</strong>
+          <small><b>{candidate.title}</b> · Preview the message before sending it.</small>
+        </div>
+        <button className={styles.compactAction} type="button" onClick={prepare}>Ask Matt about this</button>
+      </section>
+    );
+  }
+
   return (
-    <details className={styles.assist}>
-      <summary><span aria-hidden="true">◇</span><strong>Something Matt may need to handle</strong><small>Preview the message before sending it.</small></summary>
+    <section className={styles.assist} aria-labelledby="family-assist-title">
+      <div className={styles.header}>
+        <span aria-hidden="true">◇</span>
+        <div>
+          <p className={styles.eyebrow}>PARENT HELP</p>
+          <strong id="family-assist-title">Something Matt may need to handle</strong>
+          <small>Preview the message before sending it.</small>
+        </div>
+      </div>
       <div className={styles.body}>
         {status === "sent" && sent ? (
           <div className={styles.sent}><span aria-hidden="true">✓</span><div><strong>Delivered to Matt’s Homeroom inbox</strong><small>Only the approved request was sent.</small></div></div>
@@ -107,6 +128,6 @@ export function StudentFamilyAssist({
         )}
         {error && <p className={styles.error} role="alert">{error}</p>}
       </div>
-    </details>
+    </section>
   );
 }

@@ -596,10 +596,29 @@ export function projectStudentSources(input: {
     sourceUpdatedAt: work.updateTime
   }));
   const schoolEvents = relevantSchoolEvents(input.schoolSnapshot, parsedProfile.data.grade);
+  const localizedBandEvents = input.snapshot.events.flatMap((event) => {
+    const date = eventLocalDate(event, input.profile.timeZone);
+    return date ? [{ event, date, timeLabel: eventTimeLabel(event, input.profile.timeZone) }] : [];
+  });
+  const localizedSchoolEvents = schoolEvents.flatMap((event) => {
+    const date = eventLocalDate(event as unknown as BandCalendarEvent, input.profile.timeZone);
+    return date ? [{ event, date, timeLabel: schoolEventTimeLabel(event, input.profile.timeZone) }] : [];
+  });
+  const bandEventsByDate = new Map<string, typeof localizedBandEvents>();
+  for (const localized of localizedBandEvents) {
+    const events = bandEventsByDate.get(localized.date) ?? [];
+    events.push(localized);
+    bandEventsByDate.set(localized.date, events);
+  }
+  const schoolEventsByDate = new Map<string, typeof localizedSchoolEvents>();
+  for (const localized of localizedSchoolEvents) {
+    const events = schoolEventsByDate.get(localized.date) ?? [];
+    events.push(localized);
+    schoolEventsByDate.set(localized.date, events);
+  }
 
   const todayTimeline: TimelineBlock[] = [];
-  for (const event of input.snapshot.events) {
-    if (eventLocalDate(event, input.profile.timeZone) !== currentDate) continue;
+  for (const { event, timeLabel: localizedTimeLabel } of bandEventsByDate.get(currentDate) ?? []) {
     todayTimeline.push({
       id: `band_ical:event:${event.uid}`,
       kind: "event",
@@ -607,7 +626,7 @@ export function projectStudentSources(input: {
       courseName: null,
       startsAt: event.startsAt,
       endsAt: event.endsAt,
-      timeLabel: eventTimeLabel(event, input.profile.timeZone),
+      timeLabel: localizedTimeLabel,
       durationMinutes: event.endsAt && event.startsAt.includes("T")
         ? Math.max(0, Math.round((Date.parse(event.endsAt) - Date.parse(event.startsAt)) / 60_000))
         : null,
@@ -616,8 +635,7 @@ export function projectStudentSources(input: {
       source: sourceForEvent(event)
     });
   }
-  for (const event of schoolEvents) {
-    if (eventLocalDate(event as unknown as BandCalendarEvent, input.profile.timeZone) !== currentDate) continue;
+  for (const { event, timeLabel: localizedTimeLabel } of schoolEventsByDate.get(currentDate) ?? []) {
     todayTimeline.push({
       id: `school_calendar:event:${event.uid}`,
       kind: "event",
@@ -625,7 +643,7 @@ export function projectStudentSources(input: {
       courseName: null,
       startsAt: event.startsAt,
       endsAt: event.endsAt,
-      timeLabel: schoolEventTimeLabel(event, input.profile.timeZone),
+      timeLabel: localizedTimeLabel,
       durationMinutes: null,
       placement: "source_scheduled",
       visualToken: event.category === "school_closed" || event.category === "student_holiday" ? "blue" : "amber",
@@ -681,26 +699,24 @@ export function projectStudentSources(input: {
       visualToken: priority.urgency.visualToken,
       source: priority.source
     }));
-    for (const event of input.snapshot.events) {
-      if (eventLocalDate(event, input.profile.timeZone) !== date) continue;
+    for (const { event, timeLabel: localizedTimeLabel } of bandEventsByDate.get(date) ?? []) {
       items.push({
         id: `band_ical:event:${event.uid}:week`,
         kind: "event",
         title: event.title,
         courseName: null,
-        timeLabel: eventTimeLabel(event, input.profile.timeZone),
+        timeLabel: localizedTimeLabel,
         visualToken: "green",
         source: sourceForEvent(event)
       });
     }
-    for (const event of schoolEvents) {
-      if (eventLocalDate(event as unknown as BandCalendarEvent, input.profile.timeZone) !== date) continue;
+    for (const { event, timeLabel: localizedTimeLabel } of schoolEventsByDate.get(date) ?? []) {
       items.push({
         id: `school_calendar:event:${event.uid}:week`,
         kind: "event",
         title: event.title,
         courseName: null,
-        timeLabel: schoolEventTimeLabel(event, input.profile.timeZone),
+        timeLabel: localizedTimeLabel,
         visualToken: event.category === "school_closed" || event.category === "student_holiday" ? "blue" : "amber",
         source: sourceForSchoolEvent(event)
       });
@@ -766,15 +782,13 @@ export function projectStudentSources(input: {
     category: "schoolwork" as const,
     source: priority.source
   }] : []);
-  for (const event of input.snapshot.events) {
-    const date = eventLocalDate(event, input.profile.timeZone);
-    if (!date) continue;
+  for (const { event, date, timeLabel: localizedTimeLabel } of localizedBandEvents) {
     calendarItems.push({
       id: `band_ical:event:${event.uid}:calendar`,
       kind: "event",
       title: event.title,
       date,
-      timeLabel: eventTimeLabel(event, input.profile.timeZone),
+      timeLabel: localizedTimeLabel,
       startsAt: event.startsAt,
       endsAt: event.endsAt,
       courseExternalId: null,
@@ -785,15 +799,13 @@ export function projectStudentSources(input: {
       source: sourceForEvent(event)
     });
   }
-  for (const event of schoolEvents) {
-    const date = eventLocalDate(event as unknown as BandCalendarEvent, input.profile.timeZone);
-    if (!date) continue;
+  for (const { event, date, timeLabel: localizedTimeLabel } of localizedSchoolEvents) {
     calendarItems.push({
       id: `school_calendar:event:${event.uid}:calendar`,
       kind: "event",
       title: event.title,
       date,
-      timeLabel: schoolEventTimeLabel(event, input.profile.timeZone),
+      timeLabel: localizedTimeLabel,
       startsAt: event.startsAt,
       endsAt: event.endsAt,
       courseExternalId: null,

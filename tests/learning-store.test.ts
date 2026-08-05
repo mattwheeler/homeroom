@@ -95,7 +95,7 @@ function learningRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe("D1 Learning continuity store", () => {
-  it("starts an independent timed session without updating Golden state", async () => {
+  it("atomically replaces any abandoned active session before starting a new one", async () => {
     const created = createLearningSession({
       session,
       courseId: "course_algebra_1",
@@ -105,7 +105,7 @@ describe("D1 Learning continuity store", () => {
       now: () => new Date("2026-07-18T12:00:00.000Z"),
       randomUUID: () => "123456789012345678901234"
     });
-    const { database, calls } = fakeDatabase();
+    const { database, calls, batches } = fakeDatabase();
     const write: StartLearningWrite = {
       learningSession: created.learningSession,
       initialTurn,
@@ -114,10 +114,13 @@ describe("D1 Learning continuity store", () => {
 
     await new D1LearningStore(database).startSession(write);
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.sql).toContain("INSERT INTO learning_sessions");
-    expect(calls[0]?.sql).not.toContain("UPDATE demo_sessions");
-    expect(JSON.stringify(calls[0]?.values)).not.toContain("previous_response_id");
+    expect(batches).toHaveLength(1);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.sql).toContain("DELETE FROM learning_sessions");
+    expect(calls[0]?.sql).toContain("status = 'active'");
+    expect(calls[1]?.sql).toContain("INSERT INTO learning_sessions");
+    expect(calls.every((call) => !call.sql.includes("UPDATE demo_sessions"))).toBe(true);
+    expect(JSON.stringify(calls.flatMap((call) => call.values))).not.toContain("previous_response_id");
   });
 
   it("atomically clears active dialogue and saves only summary, progress, and explicit memory", async () => {
@@ -224,7 +227,7 @@ describe("D1 Learning continuity store", () => {
     expect(persisted.at(-1)?.content).toContain(initialTurn.question);
   });
 
-  it("rejects stale Learning turns and failed single-row writes", async () => {
+  it("rejects stale Learning turns and failed atomic starts", async () => {
     const stale = fakeDatabase(learningRow({ turn_count: 1 }));
     await expect(new D1LearningStore(stale.database).appendTurn({
       demoSessionId: "session_01",
@@ -246,6 +249,12 @@ describe("D1 Learning continuity store", () => {
             };
           }
         };
+      },
+      async batch() {
+        return [
+          { success: true, meta: { changes: 1 } },
+          { success: false, meta: { changes: 0 } }
+        ];
       }
     };
     const created = createLearningSession({

@@ -1,8 +1,5 @@
 import { env } from "cloudflare:workers";
 
-import { emilyFixture } from "../../../../lib/domain/fixtures";
-import { projectStudentSources } from "../../../../lib/domain/student-source-projection";
-import { emilyStudentSupportProfile } from "../../../../lib/domain/student-support-profile";
 import { handleStudentBootstrap } from "../../../../lib/http/student-bootstrap-handler";
 import { StructuredLogger } from "../../../../lib/observability/logger";
 import { readCookie } from "../../../../lib/security/http";
@@ -13,13 +10,7 @@ import {
   D1PrincipalStore,
   type HouseholdBootstrap
 } from "../../../../lib/storage/principal-store";
-import { D1SchoolSourceStore } from "../../../../lib/storage/school-source-store";
 import { D1SessionStore } from "../../../../lib/storage/session-store";
-import {
-  activeSourceEventWindow,
-  D1SourceConnectionStore
-} from "../../../../lib/storage/source-connection-store";
-import { D1StudentSafetyPolicyStore } from "../../../../lib/storage/student-safety-policy-store";
 
 function emails(value: string | undefined): string[] {
   return (value ?? "").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
@@ -58,9 +49,6 @@ export async function POST(request: Request) {
   }
 
   const sessions = new D1SessionStore(env.HOMEROOM_DB);
-  const sources = new D1SourceConnectionStore(env.HOMEROOM_DB);
-  const schoolSources = new D1SchoolSourceStore(env.HOMEROOM_DB);
-  const safetyPolicies = new D1StudentSafetyPolicyStore(env.HOMEROOM_DB);
   const url = new URL(request.url);
   const household: HouseholdBootstrap = {
     guardianEmail,
@@ -83,25 +71,6 @@ export async function POST(request: Request) {
     }),
     clientKey: request.headers.get("cf-connecting-ip") ?? "local-student",
     secureCookie: url.protocol === "https:",
-    logger: new StructuredLogger("student-bootstrap"),
-    projection: async (session, now) => {
-      const studentId = session.studentId ?? session.actorId;
-      const [snapshot, schoolSnapshot, externalLinkPolicy] = await Promise.all([
-        sources.getStudentSnapshot(studentId, activeSourceEventWindow(now)),
-        schoolSources.getStudentSnapshot(studentId),
-        safetyPolicies.findExternalLinkPolicy(studentId).catch(() => "blocked" as const)
-      ]);
-      return projectStudentSources({
-        snapshot,
-        schoolSnapshot,
-        externalLinkPolicy: externalLinkPolicy ?? "blocked",
-        profile: {
-          ...emilyStudentSupportProfile,
-          timeZone: emilyFixture.timeZone,
-          supportPreference: "example_first"
-        },
-        now
-      });
-    }
+    logger: new StructuredLogger("student-bootstrap")
   });
 }
